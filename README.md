@@ -4,14 +4,14 @@
 
 ---
 
-## 📌 Phase 3 Status: Secure Authentication
-Phase 3 establishes an enterprise-grade authentication foundation:
-- **Argon2id Password Hashing**: Cryptographically modern parameters (64MB memory cost, 3 iterations) resisting GPU and cache timing attacks.
-- **Stateless Short-Lived JWT Access Tokens**: 15-minute expiration, validating `issuer` (`payrail-auth`), `audience` (`payrail-api`), and signed using private secrets.
-- **Redis Token Blocklist (Revocation)**: `POST /api/v1/auth/logout` revokes tokens in Redis matching the remaining JWT lifespan.
-- **Zero-Trust Identity Derivation**: User profile and access control derive strictly from authenticated JWT context, never trusting client-provided `userId` parameters.
-- **Defensive Error Handling**: Generic `401 Unauthorized` responses mitigate user enumeration.
-- **Strict Input Validation**: Zod schemas validate registration (complexity constraints) and login with lowercase email normalization.
+## 📌 Phase 4 Status: Wallets, Ledger & Simulated Cards
+Phase 4 implements core ledger and wallet financial infrastructure:
+- **Integer Minor Monetary Units**: All monetary balances, deposits, and spending limits are stored strictly as integers in minor units (e.g. Paise for INR, Cents for USD). Floating-point arithmetic is strictly prohibited.
+- **Append-Only Immutable Ledger**: Double-entry journal entries (`LedgerEntryModel`) cannot be modified or deleted. Mongoose pre-hooks block update and overwrite calls.
+- **Multi-Document ACID Transactions**: Wallet balances and corresponding ledger entries are modified together in single-node MongoDB replica-set transactions.
+- **Continuous Balance Reconciliation**: `GET /api/v1/wallets/:id/reconcile` asserts that active balance matches $\sum(\text{CREDIT}) - \sum(\text{DEBIT})$ across the immutable journal.
+- **Simulated Virtual Prepaid Cards**: Generates virtual cards with masked PANs (`•••• •••• •••• 1234`), expiry dates, and spending limits. No real card numbers or CVVs are created or stored. Includes lifecycle `FREEZE`, `UNFREEZE`, and `TERMINATE` controls.
+- **Strict Ownership & Anti-IDOR Enforcement**: Every wallet and card operation validates authenticated caller identity derived exclusively from the verified JWT.
 
 ---
 
@@ -30,157 +30,115 @@ Phase 3 establishes an enterprise-grade authentication foundation:
 
 ---
 
-## 📡 Authentication API Examples
+## 📡 API Endpoints (Phase 4)
 
-### 1. Register User
-`POST /api/v1/auth/register`
-```bash
-curl -X POST http://localhost:3000/api/v1/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "alice@example.com",
-    "password": "Password123!",
-    "firstName": "Alice",
-    "lastName": "Smith"
-  }'
-```
-**Response (201 Created):**
-```json
-{
-  "success": true,
-  "message": "User registered successfully",
-  "data": {
-    "user": {
-      "id": "671ad203e3c09b...",
-      "email": "alice@example.com",
-      "firstName": "Alice",
-      "lastName": "Smith",
-      "role": "user",
-      "createdAt": "2026-10-24T14:40:00.000Z"
-    },
-    "token": "eyJhbGciOi...",
-    "expiresIn": "15m"
-  },
-  "meta": {
-    "requestId": "4d16616a-...",
-    "timestamp": "2026-10-24T14:40:00.000Z"
-  }
-}
-```
+### Authentication
+| Endpoint | Method | Auth | Description |
+| :--- | :--- | :--- | :--- |
+| `/api/v1/auth/register` | `POST` | No | Register new user account |
+| `/api/v1/auth/login` | `POST` | No | Authenticate user credentials and receive JWT |
+| `/api/v1/auth/me` | `GET` | **Bearer** | Retrieve authenticated profile |
+| `/api/v1/auth/logout` | `POST` | **Bearer** | Revoke access token in Redis |
 
-### 2. Login User
-`POST /api/v1/auth/login`
-```bash
-curl -X POST http://localhost:3000/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "alice@example.com",
-    "password": "Password123!"
-  }'
-```
+### Wallets & Ledger
+| Endpoint | Method | Auth | Description |
+| :--- | :--- | :--- | :--- |
+| `/api/v1/wallets` | `GET` | **Bearer** | List all wallets owned by authenticated user |
+| `/api/v1/wallets` | `POST` | **Bearer** | Retrieve or create wallet for specified currency (`INR`, `USD`, `EUR`, `GBP`) |
+| `/api/v1/wallets/:id` | `GET` | **Bearer** | Get wallet details and balance |
+| `/api/v1/wallets/:id/deposit` | `POST` | **Bearer** | Simulated test funding deposit (strictly in integer minor units) |
+| `/api/v1/wallets/:id/transactions` | `GET` | **Bearer** | Paginated wallet ledger history (`page`, `limit`) |
+| `/api/v1/wallets/:id/reconcile` | `GET` | **Bearer** | Reconcile wallet balance against immutable ledger sum |
+| `/api/v1/ledger` | `GET` | **Bearer** | Paginated user-wide ledger journal |
 
-### 3. Get Authenticated Profile
-`GET /api/v1/auth/me`
-```bash
-curl -X GET http://localhost:3000/api/v1/auth/me \
-  -H "Authorization: Bearer <TOKEN>"
-```
-
-### 4. Logout / Token Revocation
-`POST /api/v1/auth/logout`
-```bash
-curl -X POST http://localhost:3000/api/v1/auth/logout \
-  -H "Authorization: Bearer <TOKEN>"
-```
-*Subsequent requests using the revoked token will receive `401 Unauthorized: Token has been revoked`.*
+### Simulated Virtual Prepaid Cards
+| Endpoint | Method | Auth | Description |
+| :--- | :--- | :--- | :--- |
+| `/api/v1/cards` | `GET` | **Bearer** | List all virtual cards owned by authenticated user |
+| `/api/v1/cards` | `POST` | **Bearer** | Create a virtual simulated card linked to a wallet |
+| `/api/v1/cards/:id` | `GET` | **Bearer** | Retrieve single virtual card details (masked PAN) |
+| `/api/v1/cards/:id/status` | `PATCH` | **Bearer** | Freeze or unfreeze card (`ACTIVE`, `FROZEN`, `TERMINATED`) |
 
 ---
 
-## 🚀 Infrastructure Management Commands
+## 📡 API Usage Examples (cURL)
 
-### 1. Start Services
-To start MongoDB (replica set), Redis (authenticated), and RabbitMQ in the background:
-```powershell
-docker compose up -d
+### 1. Create / Retrieve INR Wallet
+```bash
+curl -X POST http://localhost:3000/api/v1/wallets \
+  -H "Authorization: Bearer <TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"currency": "INR"}'
 ```
 
-### 2. Inspect Running Services & Health Checks
-```powershell
-docker compose ps
-```
-To view health logs for individual services:
-```powershell
-docker logs payrail-mongodb
-docker logs payrail-mongodb-setup
-docker logs payrail-redis
-docker logs payrail-rabbitmq
-```
-
-### 3. Stop Services
-- Stop containers (preserving data volumes):
-  ```powershell
-  docker compose stop
-  ```
-- Down containers and remove private network:
-  ```powershell
-  docker compose down
-  ```
-- Down containers and remove persistent volumes:
-  ```powershell
-  docker compose down -v
-  ```
-
----
-
-## 🚀 Running the Application
-
-### 1. Installation
-```powershell
-npm install
+### 2. Simulated Test Deposit (e.g. 50,000 Paise = 500 INR)
+```bash
+curl -X POST http://localhost:3000/api/v1/wallets/<WALLET_ID>/deposit \
+  -H "Authorization: Bearer <TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "amount": 50000,
+    "reference": "DEV_TEST_SEED"
+  }'
 ```
 
-### 2. Environment Configuration
-Copy `.env.example` to `.env`:
-```powershell
-cp .env.example .env
-```
-Default ports and credentials configured:
-- `PORT`: `3000` (API process)
-- `MONGO_PORT`: `27018` (Mapped to container port `27017` to avoid clashing with local mongod)
-- `REDIS_PORT`: `6379`
-- `RABBITMQ_PORT`: `5672`
-- `RABBITMQ_MGMT_PORT`: `15672`
-- `JWT_SECRET`: `payrail_super_secret_jwt_key_dev_mode_32chars`
-- `JWT_EXPIRES_IN`: `15m`
-
-### 3. Start Development Server
-```powershell
-npm run dev
+### 3. Reconcile Wallet Balance with Ledger Entries
+```bash
+curl -X GET http://localhost:3000/api/v1/wallets/<WALLET_ID>/reconcile \
+  -H "Authorization: Bearer <TOKEN>"
 ```
 
-### 4. Code Quality & Build Checks
-```powershell
-npm run typecheck
-npm run lint
-npm run format
-npm run build
+### 4. Create Simulated Virtual Card
+```bash
+curl -X POST http://localhost:3000/api/v1/cards \
+  -H "Authorization: Bearer <TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "walletId": "<WALLET_ID>",
+    "cardholderName": "Alice Smith",
+    "spendingLimit": 25000
+  }'
 ```
+
+### 5. Freeze Virtual Card
+```bash
+curl -X PATCH http://localhost:3000/api/v1/cards/<CARD_ID>/status \
+  -H "Authorization: Bearer <TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "FROZEN"}'
+```
+
+### 6. Execute Secure Idempotent Transfer (Phase 5)
+```bash
+curl -X POST http://localhost:3000/api/v1/transfers \
+  -H "Authorization: Bearer <TOKEN>" \
+  -H "x-idempotency-key: unique-request-uuid-v4" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sourceWalletId": "<SOURCE_WALLET_ID>",
+    "destinationWalletId": "<DEST_WALLET_ID>",
+    "amount": 10000,
+    "description": "Payment for invoice #1042"
+  }'
+```
+
+> **Idempotency Semantics:**
+> - Scope: Key is scoped to `(userId, operation, idempotencyKey)`.
+> - Replay: Re-submitting an identical request with the same key returns the original result with HTTP 200 (`idempotencyStatus: "REPLAYED"`) without moving funds again.
+> - Payload Conflict: Changing amounts or wallets with an already used key returns `409 Conflict`.
+> - Concurrency Safety: 20 simultaneous requests with the same key execute exactly once; remaining requests resolve safely without double-debiting.
 
 ---
 
 ## 🧪 Testing
 
-### Unit, Integration, Auth & Transaction Tests (Jest + Supertest)
 ```powershell
 npm test
 ```
-All 25 tests across 4 suites validate:
-1. `tests/auth.test.ts`: Registration, login, normalized emails, generic errors, tampered/expired tokens, and Redis logout revocation.
-2. `tests/transactions.test.ts`: Multi-document ACID transaction commit/abort.
-3. `tests/health.test.ts`: Liveness and deep readiness probes.
-4. `tests/api.test.ts`: Route definitions and error handling.
-
----
-
-## 📄 Documentation
-Comprehensive architecture details and decision logs can be found in [docs/architecture.md](docs/architecture.md).
+All 47 tests across 6 test suites pass cleanly:
+- `tests/transfers.test.ts`: Phase 5 idempotent transfers, fingerprint validation, 409 conflicts on mismatch, 20 concurrent identical request stress test, and simultaneous distinct wallet debits.
+- `tests/wallets.test.ts`: Wallet creation, currency constraints, integer minor units, simulated deposits, IDOR protection, ledger immutability & reconciliation, and card freeze/unfreeze controls.
+- `tests/auth.test.ts`: Registration, login, normalized emails, generic errors, tampered/expired tokens, and Redis logout revocation.
+- `tests/transactions.test.ts`: MongoDB replica set multi-document ACID transactions with commit/abort.
+- `tests/health.test.ts`: Liveness and deep readiness probes.
+- `tests/api.test.ts`: Route definitions and error handling.
