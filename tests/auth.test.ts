@@ -154,6 +154,29 @@ describe('Authentication Module (Phase 3)', () => {
       expect(res.body.data).not.toHaveProperty('passwordHash');
     });
 
+    it('should prevent IDOR: ignore client-supplied userId in query string or body and only return own profile', async () => {
+      // Register a second victim user
+      const victimUser = await UserModel.create({
+        email: 'victim@example.com',
+        passwordHash: 'dummyhash',
+        firstName: 'Victim',
+        lastName: 'User',
+      });
+
+      // Attacker uses testUser's token, but attempts to inject victim's ID in query and body
+      const res = await request(app)
+        .get(`/api/v1/auth/me?userId=${victimUser.id}`)
+        .send({ userId: victimUser.id })
+        .set('Authorization', `Bearer ${validToken}`);
+
+      expect(res.status).toBe(200);
+      // Response must strictly be the authenticated caller (testUser), NOT victimUser
+      expect(res.body.data.email).toBe(testUser.email);
+      expect(res.body.data.email).not.toBe(victimUser.email);
+      expect(res.body.data.firstName).toBe(testUser.firstName);
+      expect(res.body.data.id).not.toBe(victimUser.id);
+    });
+
     it('should reject request without Authorization header', async () => {
       const res = await request(app).get('/api/v1/auth/me');
 
