@@ -24,22 +24,34 @@ healthRouter.get('/health', (req: Request, res: Response) => {
 /**
  * Readiness Probe: /ready
  * Indicates whether the service and its core dependencies are ready to accept requests.
- * Evaluates state of MongoDB, Redis, and RabbitMQ.
+ * Evaluates state of MongoDB, Redis, and RabbitMQ, including transaction support when active.
  */
 healthRouter.get('/ready', async (req: Request, res: Response) => {
-  const mongoStatus = database.getMongoStatus();
+  const mongoStatus = await database.checkMongoStatus();
   const redisStatus = await database.checkRedisStatus();
   const rabbitmqStatus = await database.checkRabbitMQStatus();
 
-  // In test/mock environment, service can be marked ready or degraded cleanly
   const allServicesUp = mongoStatus === 'up' && redisStatus === 'up' && rabbitmqStatus === 'up';
+
+  let transactionsSupported = false;
+  if (mongoStatus === 'up') {
+    transactionsSupported = await database.verifyMongoTransactions();
+  }
 
   const readinessData = {
     status: allServicesUp ? 'ready' : 'degraded',
     dependencies: {
-      mongodb: mongoStatus,
-      redis: redisStatus,
-      rabbitmq: rabbitmqStatus,
+      mongodb: {
+        status: mongoStatus,
+        transactions: transactionsSupported ? 'supported' : 'unsupported',
+      },
+      redis: {
+        status: redisStatus,
+        authenticated: redisStatus === 'up',
+      },
+      rabbitmq: {
+        status: rabbitmqStatus,
+      },
     },
     timestamp: new Date().toISOString(),
     meta: {
@@ -47,7 +59,6 @@ healthRouter.get('/ready', async (req: Request, res: Response) => {
     },
   };
 
-  // If critical dependencies are down, return 503 so load balancers stop routing traffic
   if (!allServicesUp) {
     res.status(503).json(readinessData);
     return;

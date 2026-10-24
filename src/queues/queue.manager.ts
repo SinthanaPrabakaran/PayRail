@@ -1,5 +1,5 @@
 import amqplib from 'amqplib';
-import { env } from '../config/env.js';
+import { rabbitmqManager } from '../config/rabbitmq.js';
 import { logger } from '../shared/logger.js';
 
 export const QUEUES = {
@@ -9,13 +9,11 @@ export const QUEUES = {
 } as const;
 
 export class QueueManager {
-  private static connection: amqplib.ChannelModel | null = null;
   private static channel: amqplib.Channel | null = null;
 
   public static async getChannel(): Promise<amqplib.Channel> {
     if (!this.channel) {
-      this.connection = await amqplib.connect(env.RABBITMQ_URL);
-      const ch = await this.connection.createChannel();
+      const ch = await rabbitmqManager.getChannel();
 
       for (const queueName of Object.values(QUEUES)) {
         await ch.assertQueue(queueName, { durable: true });
@@ -43,9 +41,6 @@ export class QueueManager {
       await this.channel.close().catch(() => null);
       this.channel = null;
     }
-    if (this.connection) {
-      await this.connection.close().catch(() => null);
-      this.connection = null;
-    }
+    await rabbitmqManager.disconnect();
   }
 }

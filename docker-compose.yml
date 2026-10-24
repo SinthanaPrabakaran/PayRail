@@ -1,40 +1,86 @@
-version: '3.8'
-
 services:
   mongodb:
     image: mongo:7.0
     container_name: payrail-mongodb
     restart: unless-stopped
+    command: ["--replSet", "rs0", "--bind_ip_all", "--port", "27017"]
     ports:
-      - '27017:27017'
+      - "127.0.0.1:${MONGO_PORT:-27017}:27017"
     environment:
-      MONGO_INITDB_DATABASE: payrail
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE:-payrail}
     volumes:
       - mongo_data:/data/db
+      - ./scripts/init-mongo-rs.sh:/scripts/init-mongo-rs.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --port 27017 --quiet --eval 'try { rs.status().ok } catch(e) { 0 }' | grep -q 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    networks:
+      - payrail-network
+
+  mongodb-setup:
+    image: mongo:7.0
+    container_name: payrail-mongodb-setup
+    restart: "no"
+    depends_on:
+      mongodb:
+        condition: service_started
+    volumes:
+      - ./scripts/init-mongo-rs.sh:/scripts/init-mongo-rs.sh:ro
+    entrypoint: ["bash", "/scripts/init-mongo-rs.sh"]
+    networks:
+      - payrail-network
 
   redis:
     image: redis:7.2-alpine
     container_name: payrail-redis
     restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-payrail_redis_pass_dev}", "--appendonly", "yes"]
     ports:
-      - '6379:6379'
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-payrail_redis_pass_dev}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 3s
+    networks:
+      - payrail-network
 
   rabbitmq:
     image: rabbitmq:3.13-management-alpine
     container_name: payrail-rabbitmq
     restart: unless-stopped
     ports:
-      - '5672:5672'   # AMQP protocol
-      - '15672:15672' # Management UI
+      - "127.0.0.1:${RABBITMQ_PORT:-5672}:5672"
+      - "127.0.0.1:${RABBITMQ_MGMT_PORT:-15672}:15672"
     environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-payrail}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-payrail_rabbit_pass_dev}
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - payrail-network
+
+networks:
+  payrail-network:
+    name: payrail-network
+    driver: bridge
 
 volumes:
   mongo_data:
+    name: payrail_mongo_data
   redis_data:
+    name: payrail_redis_data
   rabbitmq_data:
+    name: payrail_rabbitmq_data

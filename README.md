@@ -4,104 +4,117 @@
 
 ---
 
-## 📌 Phase 1 Status
-Phase 1 establishes the production-grade architectural foundation, modular scaffolding, cross-cutting concerns, environment schema validation, health/readiness probes, and CI/CD validation baselines.
-
-No fake business logic is implemented. Domain modules are cleanly isolated in `src/modules/` with interface boundaries prepared for Phase 2+.
+## 📌 Phase 2 Status
+Phase 2 establishes robust infrastructure lifecycles:
+- **MongoDB 7.0 Single-Node Replica Set (`rs0`)**: Full support for ACID multi-document transactions.
+- **Redis 7.2 (Authenticated & AOF Persistent)**: Secure cache & distributed locks.
+- **RabbitMQ 3.13 (Management UI enabled)**: AMQP messaging broker with separate credentials.
+- **Lifecycle-Managed Modules**: Dedicated connection managers ([src/config/mongo.ts](src/config/mongo.ts), [src/config/redis.ts](src/config/redis.ts), [src/config/rabbitmq.ts](src/config/rabbitmq.ts)) featuring bounded retries and clean disposal.
+- **Safe Startup & Graceful Shutdown**: Ordered connection bootstrap and clean SIGTERM/SIGINT teardown.
+- **Deep Health & Readiness Probes**: Evaluates connection states and live MongoDB transaction capabilities at `/ready`.
 
 ---
 
 ## 🏗️ Architecture & Features Overview
 - **Feature-Oriented Structure**: Scalable modular code organization under `src/modules/` (`auth`, `wallets`, `transfers`, `ledger`, `cards`, `notifications`).
-- **Strict TypeScript**: Configured with `strict: true`, `noImplicitAny`, and `exactOptionalPropertyTypes` style constraints.
+- **Strict TypeScript**: Configured with `strict: true`, `noImplicitAny`, and comprehensive types.
 - **Fail-Fast Environment Validation**: Zod-based configuration schema with explicit typing (`src/config/env.ts`).
 - **Resilient Health Probes**:
   - `GET /health` (Liveness): Validates HTTP event-loop responsiveness.
-  - `GET /ready` (Readiness): Deep-checks connectivity to MongoDB, Redis, and RabbitMQ with status reporting.
+  - `GET /ready` (Readiness): Deep-checks connectivity to MongoDB, Redis, and RabbitMQ, plus verifies replica set transaction capabilities.
 - **Correlation & Tracing**: Automatic `x-request-id` propagation through middleware, response headers, and structured Winston logging.
 - **Robust Error Handling**: Domain `AppError` class hierarchy and centralized middleware generating uniform API responses.
 - **Background Jobs**: RabbitMQ queue management (`src/queues/`) and worker lifecycle abstraction (`src/workers/`).
 - **Load Testing**: Pre-configured k6 script for performance benchmarking (`tests/load/health-check.k6.js`).
-- **Container Parity**: Local multi-container infrastructure via `docker-compose.yml` and multi-stage production `Dockerfile`.
+- **Private Network & Persistent Volumes**: Isolated Docker bridge (`payrail-network`) with ports strictly bound to `127.0.0.1`.
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Infrastructure Management Commands
 
-### Prerequisites
-- Node.js LTS (v20+ or v22+)
-- Docker & Docker Compose (optional for local DBs/queues)
+### 1. Start Services
+To start MongoDB (replica set), Redis (authenticated), and RabbitMQ in the background:
+```powershell
+docker compose up -d
+```
+
+### 2. Inspect Running Services & Health Checks
+```powershell
+docker compose ps
+```
+To view health logs for individual services:
+```powershell
+docker logs payrail-mongodb
+docker logs payrail-mongodb-setup
+docker logs payrail-redis
+docker logs payrail-rabbitmq
+```
+
+### 3. Stop Services
+- Stop containers (preserving data volumes):
+  ```powershell
+  docker compose stop
+  ```
+- Down containers and remove private network:
+  ```powershell
+  docker compose down
+  ```
+- Down containers and remove persistent volumes:
+  ```powershell
+  docker compose down -v
+  ```
+
+---
+
+## 🚀 Running the Application
 
 ### 1. Installation
-Clone the repository and install dependencies:
-```bash
+```powershell
 npm install
 ```
 
 ### 2. Environment Configuration
 Copy `.env.example` to `.env`:
-```bash
+```powershell
 cp .env.example .env
 ```
-Key variables:
-- `PORT`: HTTP port (defaults to `3000`)
-- `NODE_ENV`: `development`, `production`, or `test`
-- `MONGODB_URI`: MongoDB connection string
-- `REDIS_HOST` / `REDIS_PORT`: Redis cache/locks
-- `RABBITMQ_URL`: AMQP connection URI
+Default ports configured:
+- `PORT`: `3000` (API process)
+- `MONGO_PORT`: `27018` (Mapped to container port `27017` to avoid clashing with local mongod)
+- `REDIS_PORT`: `6379`
+- `RABBITMQ_PORT`: `5672`
+- `RABBITMQ_MGMT_PORT`: `15672`
 
-### 3. Spin Up Local Infrastructure (Optional)
-Start MongoDB, Redis, and RabbitMQ via Docker Compose:
-```bash
-docker compose up -d
+### 3. Start Development Server
+```powershell
+npm run dev
 ```
 
-### 4. Running the Application
-- **Development mode** (hot-reload via `tsx`):
-  ```bash
-  npm run dev
-  ```
-- **Type checking**:
-  ```bash
-  npm run typecheck
-  ```
-- **Linting & Code Formatting**:
-  ```bash
-  npm run lint
-  npm run format
-  ```
-- **Production Build**:
-  ```bash
-  npm run build
-  npm start
-  ```
+### 4. Code Quality & Build Checks
+```powershell
+npm run typecheck
+npm run lint
+npm run format
+npm run build
+```
 
 ---
 
 ## 🧪 Testing
 
-### Unit & Integration Tests (Jest + Supertest)
-```bash
+### Unit, Integration & ACID Transaction Tests (Jest + Supertest)
+```powershell
 npm test
 ```
-To run tests with coverage reporting:
-```bash
-npm run test:coverage
-```
-
-### Performance & Load Testing (k6)
-With the application running locally:
-```bash
-k6 run tests/load/health-check.k6.js
-```
+All 12 tests across 3 suites validate `/health`, `/ready`, `/api/v1`, and MongoDB multi-document ACID transactions with session commit/rollback.
 
 ---
 
-## 📡 API Endpoints (Phase 1)
+## 📡 API Endpoints (Phase 2)
 | Endpoint | Method | Description |
 | :--- | :--- | :--- |
 | `/health` | `GET` | Liveness probe returning process uptime & requestId |
-| `/ready` | `GET` | Readiness probe checking MongoDB, Redis, & RabbitMQ status |
+| `/ready` | `GET` | Readiness probe checking MongoDB (with transaction support), Redis (auth), & RabbitMQ |
 | `/api/v1` | `GET` | Core API v1 descriptor & registered modules |
 | `/api/v1/auth` | `GET` | Auth module base endpoint (scaffold) |
 | `/api/v1/wallets` | `GET` | Wallets module base endpoint (scaffold) |

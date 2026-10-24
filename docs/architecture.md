@@ -1,4 +1,4 @@
-# PayRail Architecture Document - Phase 1
+# PayRail Architecture Document - Phase 2
 
 ## 1. System Vision
 PayRail is a simulated fintech platform delivering core banking operations:
@@ -8,32 +8,40 @@ PayRail is a simulated fintech platform delivering core banking operations:
 - Asynchronous transfer pipelines with idempotent execution
 - Event-driven notifications via RabbitMQ
 
-Phase 1 provides the production-grade foundation, architectural boundaries, observability, health probes, and runtime configurations.
+Phase 2 establishes robust, lifecycle-managed connections to external dependencies, single-node MongoDB replica-set initialization supporting multi-document ACID transactions, authenticated Redis caching, and management-enabled RabbitMQ message brokers.
+
+---
 
 ## 2. Technology Stack & Decision Matrix
 | Technology | Role | Justification |
 | :--- | :--- | :--- |
 | **Node.js LTS (v22+) & TypeScript** | Runtime & Language | Type safety with `strict: true`, modern async performance, wide library support |
 | **Express.js** | HTTP Web Framework | Mature, flexible middleware pipeline, lightweight HTTP overhead |
-| **MongoDB & Mongoose** | Primary Datastore | Document flexibility for account states, transaction metadata, and auditable event logs |
-| **Redis (ioredis)** | Cache & Distributed Lock | Low latency idempotency keys, rate limiting, distributed locking for wallet balance checks |
-| **RabbitMQ (amqplib)** | Event Bus & Message Broker | Guaranteed message delivery, dead-letter exchanges (DLX) for decoupled card and notification events |
-| **Jest & Supertest** | Testing Suite | Fast unit and HTTP integration testing |
+| **MongoDB 7.0 (Replica Set `rs0`)** | Primary Datastore | Supports multi-document ACID transactions essential for atomic balance debit/credit entries |
+| **Redis 7.2 (ioredis with Auth)** | Cache & Distributed Lock | Low latency idempotency keys, rate limiting, distributed locking with password authentication |
+| **RabbitMQ 3.13 (Management UI)** | Event Bus & Message Broker | Guaranteed message delivery, dead-letter exchanges (DLX), AMQP channel pooling |
+| **Jest & Supertest** | Testing Suite | Unit and HTTP integration tests with active connection disposal |
 | **k6** | Performance & Load Testing | Scriptable JavaScript load tests for validating SLAs and latency percentiles |
-| **Docker & Compose** | Containerization | Local parity with cloud environments and isolated dependencies |
-| **AWS ECS / ALB** | Target Cloud Deployment | Containerized service target monitored via semantic `/health` and `/ready` endpoints |
+| **Docker & Compose** | Containerization | Isolated bridge network (`payrail-network`), health checks, and persistent volumes |
+| **AWS ECS / ALB** | Target Cloud Deployment | Monitored via semantic `/health` and deep `/ready` endpoints |
 
-## 3. Directory Layout (Feature-Oriented)
+---
+
+## 3. Directory Layout (Phase 2)
 ```
 PayRail/
 ├── docs/                      # Architecture, ADRs, API specs
 │   └── architecture.md
-├── scripts/                   # DB migrations, seeding, dev tasks
+├── scripts/                   # DB migrations, seeding, replica-set init
+│   ├── init-mongo-rs.sh       # Reproducible MongoDB replica set initiator
 │   └── seed.ts
 ├── src/
-│   ├── config/                # Environment schema (Zod) and DB connectors
-│   │   ├── env.ts
-│   │   └── database.ts
+│   ├── config/                # Environment schema (Zod) and lifecycle connectors
+│   │   ├── env.ts             # Runtime Zod validation
+│   │   ├── mongo.ts           # MongoConnectionManager (retries, transactions)
+│   │   ├── redis.ts           # RedisConnectionManager (auth, retries)
+│   │   ├── rabbitmq.ts        # RabbitMQConnectionManager (channel lifecycle)
+│   │   └── database.ts        # Unified database/infrastructure facade
 │   ├── middleware/            # Cross-cutting HTTP middlewares
 │   │   ├── errorHandler.middleware.ts
 │   │   ├── notFound.middleware.ts
@@ -49,7 +57,7 @@ PayRail/
 │   ├── queues/                # RabbitMQ channels, queues, and publishers
 │   │   └── queue.manager.ts
 │   ├── routes/                # Central route aggregators
-│   │   ├── health.routes.ts   # /health and /ready probes
+│   │   ├── health.routes.ts   # /health and deep /ready probes
 │   │   └── v1.routes.ts       # /api/v1 mounts
 │   ├── shared/                # Universal utilities, error models, logger
 │   │   ├── errors.ts
@@ -64,24 +72,31 @@ PayRail/
 ├── tests/
 │   ├── api.test.ts            # Route and error handler tests
 │   ├── health.test.ts         # Probe tests
+│   ├── transactions.test.ts   # ACID transaction verification tests
 │   └── load/                  # k6 scripts
 │       └── health-check.k6.js
-├── docker-compose.yml         # Local stack (Mongo, Redis, RabbitMQ)
+├── docker-compose.yml         # Local stack (Mongo RS, Redis Auth, RabbitMQ Mgmt)
 ├── Dockerfile                 # Multi-stage production container build
 ├── jest.config.js             # Jest config
 ├── tsconfig.json              # TypeScript strict configuration
 └── package.json
 ```
 
-## 4. Cross-Cutting Concerns
-1. **Request Correlation (`x-request-id`)**:
-   - Each HTTP request is tagged with a UUID or adopts client-provided `x-request-id`.
-   - Propagated to response headers, Winston logs, and error responses.
-2. **Centralized Error Handling**:
-   - Custom `AppError` taxonomy (`BadRequestError`, `UnauthorizedError`, `NotFoundError`, `ConflictError`, etc.).
-   - Catches Zod validation errors and unhandled runtime exceptions with uniform JSON output.
-3. **Health & Readiness Semantics**:
-   - `GET /health` (Liveness): Returns `200 OK` if the process loop is responsive.
-   - `GET /ready` (Readiness): Inspects connectivity to MongoDB, Redis, and RabbitMQ. Returns `503 Service Unavailable` if critical dependencies are down to prevent bad routing at ALB/ingress.
-4. **Structured Logging**:
-   - Winston logger formatted as JSON in production and colorized human-readable logs in development, avoiding leaky sensitive data.
+---
+
+## 4. Infrastructure & Lifecycle Architecture
+1. **Isolated Private Network**:
+   - Containers communicate across `payrail-network` bridge.
+   - Ports are bound to `127.0.0.1` locally, preventing unwanted exposure outside localhost.
+2. **MongoDB Replica Set & Transactions**:
+   - Single-node replica set `rs0` configured via `scripts/init-mongo-rs.sh`.
+   - Supports ACID multi-document transactions via `startSession()` and `startTransaction()`.
+3. **Redis Authentication**:
+   - Protected with `--requirepass` and persistent AOF (`appendonly: yes`).
+4. **RabbitMQ Broker**:
+   - Management plugin enabled with metrics UI at `127.0.0.1:15672`.
+5. **Safe Startup & Bounded Retries**:
+   - All connectors implement bounded exponential/incremental retries (5 attempts with backoff).
+   - Server does not crash immediately if external services take a few seconds to initialize.
+6. **Clean Resource Disposal**:
+   - `SIGTERM` and `SIGINT` trigger clean shutdown: HTTP server stops accepting new connections, then active MongoDB sessions, Redis connections, and RabbitMQ channels are cleanly closed before exiting.

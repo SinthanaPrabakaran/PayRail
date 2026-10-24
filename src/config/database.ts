@@ -1,93 +1,94 @@
-import mongoose from 'mongoose';
-import Redis from 'ioredis';
-import amqplib from 'amqplib';
-import { env } from '../config/env.js';
+import { mongoManager } from './mongo.js';
+import { redisManager } from './redis.js';
+import { rabbitmqManager } from './rabbitmq.js';
 import { logger } from '../shared/logger.js';
 
-let redisClient: Redis | null = null;
-let rabbitConnection: amqplib.ChannelModel | null = null;
-
 export const database = {
-  async connectMongo(): Promise<void> {
-    try {
-      if (mongoose.connection.readyState === 1) return;
-      await mongoose.connect(env.MONGODB_URI, {
-        serverSelectionTimeoutMS: 2000,
-      });
-      logger.info('Connected to MongoDB');
-    } catch (error) {
-      logger.error('Failed to connect to MongoDB', { error });
-      throw error;
-    }
+  // MongoDB delegates
+  async connectMongo(retries?: number, delayMs?: number): Promise<void> {
+    return mongoManager.connect(retries, delayMs);
   },
-
   async disconnectMongo(): Promise<void> {
-    if (mongoose.connection.readyState !== 0) {
-      await mongoose.disconnect();
-      logger.info('Disconnected from MongoDB');
-    }
+    return mongoManager.disconnect();
   },
-
   getMongoStatus(): 'up' | 'down' {
-    return mongoose.connection.readyState === 1 ? 'up' : 'down';
+    return mongoManager.getStatus();
+  },
+  async checkMongoStatus(): Promise<'up' | 'down'> {
+    return mongoManager.checkStatus();
+  },
+  async verifyMongoTransactions(): Promise<boolean> {
+    return mongoManager.verifyTransactionSupport();
   },
 
-  getRedisClient(): Redis {
-    if (!redisClient) {
-      redisClient = new Redis({
-        host: env.REDIS_HOST,
-        port: env.REDIS_PORT,
-        password: env.REDIS_PASSWORD || undefined,
-        lazyConnect: true,
-        connectTimeout: 2000,
-        maxRetriesPerRequest: 1,
-        retryStrategy: () => null, // disable infinite auto-retry in health check context
-      });
-
-      redisClient.on('error', (err) => {
-        logger.error('Redis connection error', { error: err.message });
-      });
-    }
-    return redisClient;
+  // Redis delegates
+  getRedisClient() {
+    return redisManager.getClient();
   },
-
+  async connectRedis(retries?: number, delayMs?: number): Promise<void> {
+    return redisManager.connect(retries, delayMs);
+  },
   async checkRedisStatus(): Promise<'up' | 'down'> {
-    try {
-      const client = this.getRedisClient();
-      if (client.status === 'close' || client.status === 'end') {
-        await client.connect();
-      }
-      const ping = await client.ping();
-      return ping === 'PONG' ? 'up' : 'down';
-    } catch {
-      return 'down';
-    }
+    return redisManager.checkStatus();
   },
-
   async closeRedis(): Promise<void> {
-    if (redisClient) {
-      await redisClient.quit().catch(() => redisClient?.disconnect());
-      redisClient = null;
-    }
+    return redisManager.disconnect();
   },
 
+  // RabbitMQ delegates
+  async connectRabbitMQ(retries?: number, delayMs?: number): Promise<void> {
+    return rabbitmqManager.connect(retries, delayMs);
+  },
   async checkRabbitMQStatus(): Promise<'up' | 'down'> {
-    try {
-      if (!rabbitConnection) {
-        rabbitConnection = await amqplib.connect(env.RABBITMQ_URL, {
-          timeout: 2000,
-        });
-      }
-      return 'up';
-    } catch {
-      return 'down';
-    }
+    return rabbitmqManager.checkStatus();
+  },
+  async closeRabbitMQ(): Promise<void> {
+    return rabbitmqManager.disconnect();
   },
 
-  async closeRabbitMQ(): Promise<void> {
-    if (rabbitConnection) {
-      await rabbitConnection.close().catch(() => null);
-      rabbitConnection = null;
+  // Global infrastructure lifecycle
+  async initializeAll(
+    retries = 5,
+    delayMs = 2000,
+  ): Promise<{
+    mongo: boolean;
+    redis: boolean;
+    rabbitmq: boolean;
+  }> {
+    logger.info('Initializing all external service connections...');
+    const results = { mongo: false, redis: false, rabbitmq: false };
+
+    try {
+      await mongoManager.connect(retries, delayMs);
+      results.mongo = true;
+    } catch (err) {
+      logger.error('Failed to initialize MongoDB during startup', { err });
     }
+
+    try {
+      await redisManager.connect(retries, delayMs);
+      results.redis = true;
+    } catch (err) {
+      logger.error('Failed to initialize Redis during startup', { err });
+    }
+
+    try {
+      await rabbitmqManager.connect(retries, delayMs);
+      results.rabbitmq = true;
+    } catch (err) {
+      logger.error('Failed to initialize RabbitMQ during startup', { err });
+    }
+
+    return results;
+  },
+
+  async teardownAll(): Promise<void> {
+    logger.info('Tearing down all external service connections...');
+    await Promise.allSettled([
+      mongoManager.disconnect(),
+      redisManager.disconnect(),
+      rabbitmqManager.disconnect(),
+    ]);
+    logger.info('All external connections torn down cleanly');
   },
 };

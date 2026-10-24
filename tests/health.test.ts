@@ -26,10 +26,9 @@ describe('Health and Readiness Endpoints', () => {
   });
 
   describe('GET /ready', () => {
-    it('should return status report for dependencies (returns 503 if disconnected in test mode)', async () => {
+    it('should return status report for dependencies', async () => {
       const res = await request(app).get('/ready');
 
-      // In local unit test without active DBs, ready should return 503 degraded
       expect([200, 503]).toContain(res.status);
       expect(res.body).toHaveProperty('dependencies');
       expect(res.body.dependencies).toHaveProperty('mongodb');

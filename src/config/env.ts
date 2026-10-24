@@ -11,21 +11,27 @@ const envSchema = z.object({
   LOG_LEVEL: z
     .enum(['error', 'warn', 'info', 'http', 'verbose', 'debug', 'silly', 'silent'])
     .default('info'),
+  MONGO_PORT: z.coerce.number().default(27017),
+  MONGO_DATABASE: z.string().default('payrail'),
   MONGODB_URI: z
     .string()
     .url()
     .or(z.string().startsWith('mongodb://'))
     .or(z.string().startsWith('mongodb+srv://'))
-    .default('mongodb://localhost:27017/payrail'),
-  REDIS_HOST: z.string().default('localhost'),
+    .default('mongodb://127.0.0.1:27017/payrail?replicaSet=rs0&directConnection=true'),
+  REDIS_HOST: z.string().default('127.0.0.1'),
   REDIS_PORT: z.coerce.number().default(6379),
   REDIS_PASSWORD: z.string().optional().default(''),
+  RABBITMQ_USER: z.string().default('payrail'),
+  RABBITMQ_PASS: z.string().default('payrail_rabbit_pass_dev'),
+  RABBITMQ_PORT: z.coerce.number().default(5672),
+  RABBITMQ_MGMT_PORT: z.coerce.number().default(15672),
   RABBITMQ_URL: z
     .string()
     .url()
     .or(z.string().startsWith('amqp://'))
     .or(z.string().startsWith('amqps://'))
-    .default('amqp://guest:guest@localhost:5672'),
+    .default('amqp://payrail:payrail_rabbit_pass_dev@127.0.0.1:5672'),
   CORS_ORIGIN: z.string().default('*'),
 });
 

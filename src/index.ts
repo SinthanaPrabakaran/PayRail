@@ -9,9 +9,16 @@ const server = http.createServer(app);
 
 async function startServer(): Promise<void> {
   try {
-    // Attempt database connections in production or when explicitly configured
-    if (env.NODE_ENV === 'production') {
-      await database.connectMongo();
+    // Attempt lifecycle connection to backing dependencies in development/production
+    if (env.NODE_ENV !== 'test') {
+      logger.info('Initializing backing infrastructure services...');
+      const initResults = await database.initializeAll(5, 2000);
+      logger.info('Service initialization status:', initResults);
+
+      if (initResults.mongo) {
+        const txOk = await database.verifyMongoTransactions();
+        logger.info(`MongoDB ACID multi-document transactions supported: ${txOk}`);
+      }
     }
 
     server.listen(env.PORT, () => {
@@ -33,11 +40,9 @@ async function gracefulShutdown(signal: string): Promise<void> {
   logger.info(`Received ${signal}. Initiating graceful shutdown...`);
 
   server.close(async () => {
-    logger.info('HTTP server closed');
+    logger.info('HTTP server closed. Disposing backing service connections...');
     try {
-      await database.disconnectMongo();
-      await database.closeRedis();
-      await database.closeRabbitMQ();
+      await database.teardownAll();
       logger.info('External resources closed cleanly. Exiting.');
       process.exit(0);
     } catch (err) {
