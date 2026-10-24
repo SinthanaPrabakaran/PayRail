@@ -1,4 +1,4 @@
-# PayRail Architecture Document - Phase 2
+# PayRail Architecture Document - Phase 3
 
 ## 1. System Vision
 PayRail is a simulated fintech platform delivering core banking operations:
@@ -8,7 +8,7 @@ PayRail is a simulated fintech platform delivering core banking operations:
 - Asynchronous transfer pipelines with idempotent execution
 - Event-driven notifications via RabbitMQ
 
-Phase 2 establishes robust, lifecycle-managed connections to external dependencies, single-node MongoDB replica-set initialization supporting multi-document ACID transactions, authenticated Redis caching, and management-enabled RabbitMQ message brokers.
+Phase 3 establishes an enterprise-grade, secure authentication system featuring Argon2id password hashing, short-lived JWT access tokens with issuer and audience constraints, token revocation via Redis blocklisting, normalized email lookups, and authenticated identity derivation.
 
 ---
 
@@ -16,39 +16,44 @@ Phase 2 establishes robust, lifecycle-managed connections to external dependenci
 | Technology | Role | Justification |
 | :--- | :--- | :--- |
 | **Node.js LTS (v22+) & TypeScript** | Runtime & Language | Type safety with `strict: true`, modern async performance, wide library support |
-| **Express.js** | HTTP Web Framework | Mature, flexible middleware pipeline, lightweight HTTP overhead |
-| **MongoDB 7.0 (Replica Set `rs0`)** | Primary Datastore | Supports multi-document ACID transactions essential for atomic balance debit/credit entries |
-| **Redis 7.2 (ioredis with Auth)** | Cache & Distributed Lock | Low latency idempotency keys, rate limiting, distributed locking with password authentication |
-| **RabbitMQ 3.13 (Management UI)** | Event Bus & Message Broker | Guaranteed message delivery, dead-letter exchanges (DLX), AMQP channel pooling |
-| **Jest & Supertest** | Testing Suite | Unit and HTTP integration tests with active connection disposal |
-| **k6** | Performance & Load Testing | Scriptable JavaScript load tests for validating SLAs and latency percentiles |
-| **Docker & Compose** | Containerization | Isolated bridge network (`payrail-network`), health checks, and persistent volumes |
-| **AWS ECS / ALB** | Target Cloud Deployment | Monitored via semantic `/health` and deep `/ready` endpoints |
+| **Argon2id** | Password Hashing | Current cryptographic best practice for password hashing (winner of the Password Hashing Competition); resistant against GPU cracking and cache timing side-channels |
+| **jsonwebtoken (JWT)** | Stateless Token Generation | Short-lived (15m), strict verification with `issuer`, `audience`, and unique token ID (`jti`) |
+| **Redis Blocklist** | Revocation / Logout | Provides immediate token revocation without breaking the performance advantages of stateless JWTs |
+| **Express.js & Helmet** | HTTP Security & Routing | Safe security headers, strict body limits (1MB), customizable CORS |
+| **MongoDB 7.0 (Replica Set `rs0`)** | Datastore | Normalized unique lowercase email indexing, projection exclusion for password hashes |
+| **Zod** | Input Validation | Strict schema enforcement on registration and login inputs before hitting controller logic |
 
 ---
 
-## 3. Directory Layout (Phase 2)
+## 3. Directory Layout (Phase 3)
 ```
 PayRail/
 ├── docs/                      # Architecture, ADRs, API specs
 │   └── architecture.md
 ├── scripts/                   # DB migrations, seeding, replica-set init
-│   ├── init-mongo-rs.sh       # Reproducible MongoDB replica set initiator
+│   ├── init-mongo-rs.sh       # MongoDB replica set initiator
 │   └── seed.ts
 ├── src/
 │   ├── config/                # Environment schema (Zod) and lifecycle connectors
-│   │   ├── env.ts             # Runtime Zod validation
+│   │   ├── env.ts             # Runtime Zod validation with JWT settings
 │   │   ├── mongo.ts           # MongoConnectionManager (retries, transactions)
 │   │   ├── redis.ts           # RedisConnectionManager (auth, retries)
 │   │   ├── rabbitmq.ts        # RabbitMQConnectionManager (channel lifecycle)
 │   │   └── database.ts        # Unified database/infrastructure facade
 │   ├── middleware/            # Cross-cutting HTTP middlewares
+│   │   ├── auth.middleware.ts # JWT verification & Redis revocation check
 │   │   ├── errorHandler.middleware.ts
 │   │   ├── notFound.middleware.ts
 │   │   ├── requestId.middleware.ts
 │   │   └── requestLogger.middleware.ts
 │   ├── modules/               # Feature-oriented domain modules
-│   │   ├── auth/              # Authentication & API keys
+│   │   ├── auth/              # Authentication & User Management
+│   │   │   ├── auth.controller.ts
+│   │   │   ├── auth.routes.ts
+│   │   │   ├── auth.schema.ts
+│   │   │   ├── auth.service.ts
+│   │   │   ├── tokenRevocation.service.ts
+│   │   │   └── user.model.ts
 │   │   ├── wallets/           # Wallet balance & management
 │   │   ├── transfers/         # P2P and external transfers
 │   │   ├── ledger/            # Immutable double-entry book
@@ -62,15 +67,18 @@ PayRail/
 │   ├── shared/                # Universal utilities, error models, logger
 │   │   ├── errors.ts
 │   │   ├── logger.ts
+│   │   ├── password.ts        # Argon2id hashing & verification
+│   │   ├── token.ts           # JWT generation and verification
 │   │   └── types.ts
 │   ├── types/                 # Ambient TypeScript definitions
-│   │   └── express.d.ts
+│   │   └── express.d.ts       # Express.Request.user augmentation
 │   ├── workers/               # Background task consumers
 │   │   └── notification.worker.ts
 │   ├── app.ts                 # Express app factory
 │   └── index.ts               # HTTP server bootstrap & graceful shutdown
 ├── tests/
 │   ├── api.test.ts            # Route and error handler tests
+│   ├── auth.test.ts           # Authentication & token revocation tests
 │   ├── health.test.ts         # Probe tests
 │   ├── transactions.test.ts   # ACID transaction verification tests
 │   └── load/                  # k6 scripts
@@ -84,19 +92,26 @@ PayRail/
 
 ---
 
-## 4. Infrastructure & Lifecycle Architecture
-1. **Isolated Private Network**:
-   - Containers communicate across `payrail-network` bridge.
-   - Ports are bound to `127.0.0.1` locally, preventing unwanted exposure outside localhost.
-2. **MongoDB Replica Set & Transactions**:
-   - Single-node replica set `rs0` configured via `scripts/init-mongo-rs.sh`.
-   - Supports ACID multi-document transactions via `startSession()` and `startTransaction()`.
-3. **Redis Authentication**:
-   - Protected with `--requirepass` and persistent AOF (`appendonly: yes`).
-4. **RabbitMQ Broker**:
-   - Management plugin enabled with metrics UI at `127.0.0.1:15672`.
-5. **Safe Startup & Bounded Retries**:
-   - All connectors implement bounded exponential/incremental retries (5 attempts with backoff).
-   - Server does not crash immediately if external services take a few seconds to initialize.
-6. **Clean Resource Disposal**:
-   - `SIGTERM` and `SIGINT` trigger clean shutdown: HTTP server stops accepting new connections, then active MongoDB sessions, Redis connections, and RabbitMQ channels are cleanly closed before exiting.
+## 4. Security Architecture & Tradeoffs
+
+### 4.1 Argon2id for Password Hashing
+- **Memory Cost**: 64 MB (`2^16` KB)
+- **Time Cost**: 3 iterations
+- **Parallelism**: 1 thread
+- **Tradeoff**: Increases login computation time (~150ms) to deliberately maximize resistance against offline brute-force attacks via ASICs or GPUs.
+
+### 4.2 Short-Lived JWTs + Redis Revocation (Hybrid Architecture)
+- **Access Token TTL**: 15 minutes (`JWT_EXPIRES_IN=15m`).
+- **Cryptographic Bounds**: Validates `iss` (issuer: `payrail-auth`), `aud` (audience: `payrail-api`), and expiration `exp`.
+- **Claim Minimization**: Only includes non-sensitive identifiers (`sub`: userId, `email`, `role`, `jti`: tokenId). No sensitive PII or credentials.
+- **Revocation**: When a user logs out (`POST /api/v1/auth/logout`), the token's `jti` is stored in Redis with a TTL equal to the token's remaining lifespan. The authentication middleware validates this blocklist on every incoming request.
+- **Tradeoff**: Token verification requires a fast Redis lookup (~1ms) instead of being purely in-memory, but solves the classic JWT revocation limitation for fintech applications.
+
+### 4.3 Identity Derivation & Zero-Trust Client IDs
+- Client-supplied `userId` in path or body is **never trusted** to determine who is acting on an account.
+- The acting user identity (`req.user.userId`) is derived exclusively from the verified token signature.
+
+### 4.4 Defensive Error Handling & Anti-Enumeration
+- Login failures return a generic `401 Unauthorized: Invalid email or password` whether the email doesn't exist or the password didn't match.
+- Schema errors return structured 400 Bad Request responses without leaking server internals.
+- User schema explicitly marks `passwordHash: { select: false }`, ensuring queries and serialization never leak password hashes into responses or log pipelines.

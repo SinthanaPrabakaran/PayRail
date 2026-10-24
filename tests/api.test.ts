@@ -27,7 +27,7 @@ describe('API v1 Routing and Module Scaffolds', () => {
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('module', mod);
-        expect(res.body).toHaveProperty('status', 'initialized');
+        expect(['initialized', 'active']).toContain(res.body.status);
       });
     });
   });

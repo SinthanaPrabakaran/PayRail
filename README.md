@@ -4,14 +4,14 @@
 
 ---
 
-## 📌 Phase 2 Status
-Phase 2 establishes robust infrastructure lifecycles:
-- **MongoDB 7.0 Single-Node Replica Set (`rs0`)**: Full support for ACID multi-document transactions.
-- **Redis 7.2 (Authenticated & AOF Persistent)**: Secure cache & distributed locks.
-- **RabbitMQ 3.13 (Management UI enabled)**: AMQP messaging broker with separate credentials.
-- **Lifecycle-Managed Modules**: Dedicated connection managers ([src/config/mongo.ts](src/config/mongo.ts), [src/config/redis.ts](src/config/redis.ts), [src/config/rabbitmq.ts](src/config/rabbitmq.ts)) featuring bounded retries and clean disposal.
-- **Safe Startup & Graceful Shutdown**: Ordered connection bootstrap and clean SIGTERM/SIGINT teardown.
-- **Deep Health & Readiness Probes**: Evaluates connection states and live MongoDB transaction capabilities at `/ready`.
+## 📌 Phase 3 Status: Secure Authentication
+Phase 3 establishes an enterprise-grade authentication foundation:
+- **Argon2id Password Hashing**: Cryptographically modern parameters (64MB memory cost, 3 iterations) resisting GPU and cache timing attacks.
+- **Stateless Short-Lived JWT Access Tokens**: 15-minute expiration, validating `issuer` (`payrail-auth`), `audience` (`payrail-api`), and signed using private secrets.
+- **Redis Token Blocklist (Revocation)**: `POST /api/v1/auth/logout` revokes tokens in Redis matching the remaining JWT lifespan.
+- **Zero-Trust Identity Derivation**: User profile and access control derive strictly from authenticated JWT context, never trusting client-provided `userId` parameters.
+- **Defensive Error Handling**: Generic `401 Unauthorized` responses mitigate user enumeration.
+- **Strict Input Validation**: Zod schemas validate registration (complexity constraints) and login with lowercase email normalization.
 
 ---
 
@@ -27,6 +27,72 @@ Phase 2 establishes robust infrastructure lifecycles:
 - **Background Jobs**: RabbitMQ queue management (`src/queues/`) and worker lifecycle abstraction (`src/workers/`).
 - **Load Testing**: Pre-configured k6 script for performance benchmarking (`tests/load/health-check.k6.js`).
 - **Private Network & Persistent Volumes**: Isolated Docker bridge (`payrail-network`) with ports strictly bound to `127.0.0.1`.
+
+---
+
+## 📡 Authentication API Examples
+
+### 1. Register User
+`POST /api/v1/auth/register`
+```bash
+curl -X POST http://localhost:3000/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "alice@example.com",
+    "password": "Password123!",
+    "firstName": "Alice",
+    "lastName": "Smith"
+  }'
+```
+**Response (201 Created):**
+```json
+{
+  "success": true,
+  "message": "User registered successfully",
+  "data": {
+    "user": {
+      "id": "671ad203e3c09b...",
+      "email": "alice@example.com",
+      "firstName": "Alice",
+      "lastName": "Smith",
+      "role": "user",
+      "createdAt": "2026-10-24T14:40:00.000Z"
+    },
+    "token": "eyJhbGciOi...",
+    "expiresIn": "15m"
+  },
+  "meta": {
+    "requestId": "4d16616a-...",
+    "timestamp": "2026-10-24T14:40:00.000Z"
+  }
+}
+```
+
+### 2. Login User
+`POST /api/v1/auth/login`
+```bash
+curl -X POST http://localhost:3000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "alice@example.com",
+    "password": "Password123!"
+  }'
+```
+
+### 3. Get Authenticated Profile
+`GET /api/v1/auth/me`
+```bash
+curl -X GET http://localhost:3000/api/v1/auth/me \
+  -H "Authorization: Bearer <TOKEN>"
+```
+
+### 4. Logout / Token Revocation
+`POST /api/v1/auth/logout`
+```bash
+curl -X POST http://localhost:3000/api/v1/auth/logout \
+  -H "Authorization: Bearer <TOKEN>"
+```
+*Subsequent requests using the revoked token will receive `401 Unauthorized: Token has been revoked`.*
 
 ---
 
@@ -78,12 +144,14 @@ Copy `.env.example` to `.env`:
 ```powershell
 cp .env.example .env
 ```
-Default ports configured:
+Default ports and credentials configured:
 - `PORT`: `3000` (API process)
 - `MONGO_PORT`: `27018` (Mapped to container port `27017` to avoid clashing with local mongod)
 - `REDIS_PORT`: `6379`
 - `RABBITMQ_PORT`: `5672`
 - `RABBITMQ_MGMT_PORT`: `15672`
+- `JWT_SECRET`: `payrail_super_secret_jwt_key_dev_mode_32chars`
+- `JWT_EXPIRES_IN`: `15m`
 
 ### 3. Start Development Server
 ```powershell
@@ -102,26 +170,15 @@ npm run build
 
 ## 🧪 Testing
 
-### Unit, Integration & ACID Transaction Tests (Jest + Supertest)
+### Unit, Integration, Auth & Transaction Tests (Jest + Supertest)
 ```powershell
 npm test
 ```
-All 12 tests across 3 suites validate `/health`, `/ready`, `/api/v1`, and MongoDB multi-document ACID transactions with session commit/rollback.
-
----
-
-## 📡 API Endpoints (Phase 2)
-| Endpoint | Method | Description |
-| :--- | :--- | :--- |
-| `/health` | `GET` | Liveness probe returning process uptime & requestId |
-| `/ready` | `GET` | Readiness probe checking MongoDB (with transaction support), Redis (auth), & RabbitMQ |
-| `/api/v1` | `GET` | Core API v1 descriptor & registered modules |
-| `/api/v1/auth` | `GET` | Auth module base endpoint (scaffold) |
-| `/api/v1/wallets` | `GET` | Wallets module base endpoint (scaffold) |
-| `/api/v1/transfers` | `GET` | Transfers module base endpoint (scaffold) |
-| `/api/v1/ledger` | `GET` | Ledger module base endpoint (scaffold) |
-| `/api/v1/cards` | `GET` | Cards module base endpoint (scaffold) |
-| `/api/v1/notifications` | `GET` | Notifications module base endpoint (scaffold) |
+All 25 tests across 4 suites validate:
+1. `tests/auth.test.ts`: Registration, login, normalized emails, generic errors, tampered/expired tokens, and Redis logout revocation.
+2. `tests/transactions.test.ts`: Multi-document ACID transaction commit/abort.
+3. `tests/health.test.ts`: Liveness and deep readiness probes.
+4. `tests/api.test.ts`: Route definitions and error handling.
 
 ---
 

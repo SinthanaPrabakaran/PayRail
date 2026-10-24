@@ -33,6 +33,10 @@ const envSchema = z.object({
     .or(z.string().startsWith('amqps://'))
     .default('amqp://payrail:payrail_rabbit_pass_dev@127.0.0.1:5672'),
   CORS_ORIGIN: z.string().default('*'),
+  JWT_SECRET: z.string().min(16).default('payrail_super_secret_jwt_key_dev_mode_32chars'),
+  JWT_EXPIRES_IN: z.string().default('15m'),
+  JWT_ISSUER: z.string().default('payrail-auth'),
+  JWT_AUDIENCE: z.string().default('payrail-api'),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);
