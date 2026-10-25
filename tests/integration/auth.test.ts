@@ -1,10 +1,10 @@
 import request from 'supertest';
-import { createApp } from '../src/app';
-import { mongoManager } from '../src/config/mongo';
-import { redisManager } from '../src/config/redis';
-import { UserModel } from '../src/modules/auth/user.model';
+import { createApp } from '../../src/app';
+import { mongoManager } from '../../src/config/mongo';
+import { redisManager } from '../../src/config/redis';
+import { UserModel } from '../../src/modules/auth/user.model';
 import jwt from 'jsonwebtoken';
-import { env } from '../src/config/env';
+import { env } from '../../src/config/env';
 
 describe('Authentication Module (Phase 3)', () => {
   const app = createApp();

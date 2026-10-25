@@ -1,15 +1,15 @@
-import { createApp } from '../src/app';
-import { mongoManager } from '../src/config/mongo';
-import { redisManager } from '../src/config/redis';
-import { QueueManager, QUEUES, EXCHANGES, ROUTING_KEYS } from '../src/queues/queue.manager';
-import { OutboxModel } from '../src/modules/outbox/outbox.model';
-import { OutboxService } from '../src/modules/outbox/outbox.service';
-import { ProcessedJobModel } from '../src/modules/jobs/processed-job.model';
-import { NotificationWorker } from '../src/workers/notification.worker';
-import { StatementWorker } from '../src/workers/statement.worker';
-import { UserModel } from '../src/modules/auth/user.model';
-import { WalletService } from '../src/modules/wallets/wallet.service';
-import { generateAccessToken } from '../src/shared/token';
+import { createApp } from '../../src/app';
+import { mongoManager } from '../../src/config/mongo';
+import { redisManager } from '../../src/config/redis';
+import { QueueManager, QUEUES, EXCHANGES, ROUTING_KEYS } from '../../src/queues/queue.manager';
+import { OutboxModel } from '../../src/modules/outbox/outbox.model';
+import { OutboxService } from '../../src/modules/outbox/outbox.service';
+import { ProcessedJobModel } from '../../src/modules/jobs/processed-job.model';
+import { NotificationWorker } from '../../src/workers/notification.worker';
+import { StatementWorker } from '../../src/workers/statement.worker';
+import { UserModel } from '../../src/modules/auth/user.model';
+import { WalletService } from '../../src/modules/wallets/wallet.service';
+import { generateAccessToken } from '../../src/shared/token';
 import request from 'supertest';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -199,6 +199,7 @@ describe('Phase 7: RabbitMQ Asynchronous Notifications, Statements, Outbox & DLQ
   describe('4. Poison Messages & Dead-Letter Routing (DLQ)', () => {
     it('should reject malformed/unparseable poison message directly to payrail.dead_letter queue without infinite looping', async () => {
       const channel = await QueueManager.getChannel();
+      await channel.purgeQueue(QUEUES.DEAD_LETTER);
 
       // Publish completely invalid non-JSON payload to notifications queue
       channel.sendToQueue(QUEUES.NOTIFICATIONS, Buffer.from('NOT_A_VALID_JSON_STRING'), {
@@ -218,6 +219,7 @@ describe('Phase 7: RabbitMQ Asynchronous Notifications, Statements, Outbox & DLQ
 
     it('should route invalid schema message to Dead Letter Queue without crashing worker', async () => {
       const channel = await QueueManager.getChannel();
+      await channel.purgeQueue(QUEUES.DEAD_LETTER);
 
       // Publish JSON that violates required schema (missing version, eventId, etc)
       const invalidSchema = { invalidProperty: 'no-schema-match' };

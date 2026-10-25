@@ -1,14 +1,14 @@
 import request from 'supertest';
-import { createApp } from '../src/app';
-import { mongoManager } from '../src/config/mongo';
-import { redisManager } from '../src/config/redis';
-import { UserModel } from '../src/modules/auth/user.model';
-import { WalletModel } from '../src/modules/wallets/wallet.model';
-import { TransferModel } from '../src/modules/transfers/transfer.model';
-import { IdempotencyModel } from '../src/modules/transfers/idempotency.model';
-import { LedgerEntryModel } from '../src/modules/ledger/ledger.model';
-import { WalletService } from '../src/modules/wallets/wallet.service';
-import { generateAccessToken } from '../src/shared/token';
+import { createApp } from '../../src/app';
+import { mongoManager } from '../../src/config/mongo';
+import { redisManager } from '../../src/config/redis';
+import { UserModel } from '../../src/modules/auth/user.model';
+import { WalletModel } from '../../src/modules/wallets/wallet.model';
+import { TransferModel } from '../../src/modules/transfers/transfer.model';
+import { IdempotencyModel } from '../../src/modules/transfers/idempotency.model';
+import { LedgerEntryModel } from '../../src/modules/ledger/ledger.model';
+import { WalletService } from '../../src/modules/wallets/wallet.service';
+import { generateAccessToken } from '../../src/shared/token';
 
 describe('Phase 5: Secure Idempotent Transfers & Concurrency Stress Tests', () => {
   const app = createApp();

@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { mongoManager } from '../src/config/mongo';
+import { mongoManager } from '../../src/config/mongo';
 
 describe('MongoDB Transaction Verification', () => {
   afterAll(async () => {

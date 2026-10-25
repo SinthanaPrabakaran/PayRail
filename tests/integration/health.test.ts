@@ -1,8 +1,13 @@
 import request from 'supertest';
-import { createApp } from '../src/app';
+import { createApp } from '../../src/app';
+import { database } from '../../src/config/database';
 
 describe('Health and Readiness Endpoints', () => {
   const app = createApp();
+
+  afterAll(async () => {
+    await database.teardownAll();
+  });
 
   describe('GET /health', () => {
     it('should return 200 OK with liveness details and requestId header', async () => {

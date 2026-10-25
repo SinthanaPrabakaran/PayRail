@@ -1,12 +1,12 @@
 import request from 'supertest';
-import { createApp } from '../src/app';
-import { mongoManager } from '../src/config/mongo';
-import { redisManager } from '../src/config/redis';
-import { UserModel } from '../src/modules/auth/user.model';
-import { WalletModel } from '../src/modules/wallets/wallet.model';
-import { CardModel } from '../src/modules/cards/card.model';
-import { LedgerEntryModel } from '../src/modules/ledger/ledger.model';
-import { generateAccessToken } from '../src/shared/token';
+import { createApp } from '../../src/app';
+import { mongoManager } from '../../src/config/mongo';
+import { redisManager } from '../../src/config/redis';
+import { UserModel } from '../../src/modules/auth/user.model';
+import { WalletModel } from '../../src/modules/wallets/wallet.model';
+import { CardModel } from '../../src/modules/cards/card.model';
+import { LedgerEntryModel } from '../../src/modules/ledger/ledger.model';
+import { generateAccessToken } from '../../src/shared/token';
 
 describe('Phase 4: Wallets, Ledger & Simulated Cards', () => {
   const app = createApp();
@@ -46,10 +46,12 @@ describe('Phase 4: Wallets, Ledger & Simulated Cards', () => {
   });
 
   afterAll(async () => {
+    if (userA?.id && userB?.id) {
+      await WalletModel.deleteMany({ userId: { $in: [userA.id, userB.id] } });
+      await CardModel.deleteMany({ userId: { $in: [userA.id, userB.id] } });
+      await LedgerEntryModel.deleteMany({ userId: { $in: [userA.id, userB.id] } });
+    }
     await UserModel.deleteMany({ email: /phase4.*@example\.com$/ });
-    await WalletModel.deleteMany({});
-    await CardModel.deleteMany({});
-    await LedgerEntryModel.deleteMany({});
     await mongoManager.disconnect();
     await redisManager.disconnect();
   });

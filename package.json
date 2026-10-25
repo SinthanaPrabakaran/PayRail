@@ -13,8 +13,10 @@
     "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\"",
     "test": "jest --runInBand --detectOpenHandles --forceExit",
+    "test:unit": "jest tests/unit --runInBand",
+    "test:integration": "jest tests/integration --runInBand --detectOpenHandles --forceExit",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage --runInBand --detectOpenHandles --forceExit"
   },
   "keywords": [
     "fintech",

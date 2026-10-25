@@ -1,12 +1,12 @@
 import request from 'supertest';
-import { createApp } from '../src/app';
-import { mongoManager } from '../src/config/mongo';
-import { redisManager } from '../src/config/redis';
-import { UserModel } from '../src/modules/auth/user.model';
-import { WalletModel } from '../src/modules/wallets/wallet.model';
-import { WalletService } from '../src/modules/wallets/wallet.service';
-import { generateAccessToken } from '../src/shared/token';
-import { CacheService } from '../src/middleware/cache.middleware';
+import { createApp } from '../../src/app';
+import { mongoManager } from '../../src/config/mongo';
+import { redisManager } from '../../src/config/redis';
+import { UserModel } from '../../src/modules/auth/user.model';
+import { WalletModel } from '../../src/modules/wallets/wallet.model';
+import { WalletService } from '../../src/modules/wallets/wallet.service';
+import { generateAccessToken } from '../../src/shared/token';
+import { CacheService } from '../../src/middleware/cache.middleware';
 
 describe('Phase 6: Redis Caching, Distributed Rate Limiting & Isolation', () => {
   const app = createApp();
