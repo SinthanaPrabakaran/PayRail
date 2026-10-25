@@ -94,9 +94,15 @@ PayRail/
 │   │   │   ├── transfer.model.ts
 │   │   │   ├── transfer.schema.ts
 │   │   │   ├── transfer.service.ts
-│   │   │   └── transfers.routes.ts
-│   │   └── notifications/     # Event-driven alert dispatch
-│   ├── queues/                # RabbitMQ channels, queues, and publishers
+│   │   ├── outbox/            # Transactional Outbox pattern
+│   │   │   ├── outbox.model.ts
+│   │   │   └── outbox.service.ts
+│   │   ├── jobs/              # Asynchronous job status & idempotency
+│   │   │   └── processed-job.model.ts
+│   │   └── notifications/     # Event-driven alert dispatch & statement triggers
+│   │       └── notifications.routes.ts
+│   ├── queues/                # RabbitMQ topology, confirms, and DLX
+│   │   ├── message.schemas.ts # Versioned Zod schemas for async events
 │   │   └── queue.manager.ts
 │   ├── routes/                # Central route aggregators
 │   │   ├── health.routes.ts   # /health and deep /ready probes
@@ -110,7 +116,8 @@ PayRail/
 │   ├── types/                 # Ambient TypeScript definitions
 │   │   └── express.d.ts       # Express.Request.user augmentation
 │   ├── workers/               # Background task consumers
-│   │   └── notification.worker.ts
+│   │   ├── notification.worker.ts # Manual acks, prefetch, DLQ
+│   │   └── statement.worker.ts    # Ledger aggregation worker
 │   ├── app.ts                 # Express app factory
 │   └── index.ts               # HTTP server bootstrap & graceful shutdown
 ├── scripts/
@@ -123,6 +130,7 @@ PayRail/
 │   ├── transactions.test.ts   # ACID transaction verification tests
 │   ├── transfers.test.ts      # Phase 5 Idempotent transfer & concurrency stress tests
 │   ├── wallets.test.ts        # Phase 4 Wallets, Ledger & Cards tests
+│   ├── workers.test.ts        # Phase 7 RabbitMQ workers, outbox, and DLQ tests
 │   └── load/                  # k6 scripts
 │       └── health-check.k6.js
 ├── docker-compose.yml         # Local stack (Mongo RS, Redis Auth, RabbitMQ Mgmt)

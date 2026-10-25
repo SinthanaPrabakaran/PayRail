@@ -132,12 +132,15 @@ curl -X POST http://localhost:3000/api/v1/transfers \
 - **Caching**: Endpoints `GET /api/v1/wallets`, `GET /api/v1/wallets/:id`, and `GET /api/v1/wallets/:id/transactions` are cached in Redis with user-scoped keys and 60s TTL.
 - **Cache Invalidation**: Writes (wallet creation, deposits, transfers) trigger an atomic $O(1)$ version bump (`payrail:cache:version:wallets:<userId>`) which instantly invalidates all cached entries for that user.
 - **Financial Correctness**: Cached balances are NEVER used as source of truth for financial operations; transfers and deposits always lock and query MongoDB with ACID transactions.
-- **Distributed Rate Limiting**: Enforced via an atomic Redis Lua sliding-window script:
-  - Public unauthenticated endpoints (`POST /api/v1/auth/login`, `POST /api/v1/auth/register`): 20 req / 60s per IP.
-  - Authenticated transfers (`POST /api/v1/transfers`): 60 req / 60s per user.
-  - Authenticated wallet operations (`/api/v1/wallets/*`): 100 req / 60s per user.
-  - Returns `429 Too Many Requests` with `Retry-After` header when limit is exceeded.
+- **Distributed Rate Limiting**: Enforced via an atomic Redis Lua sliding-window script.
 - **Redis Outage Safety**: Rate limiter and cache fail open / bypass gracefully on Redis unavailability without breaking database financial integrity.
+
+### 8. Asynchronous Notifications & Statement Jobs (Phase 7)
+- **Transactional Outbox**: Notifications and transfer side-effects are persisted atomically inside the MongoDB transfer transaction session. If the broker is unreachable, transfer commits safely and the outbox retries publication with exponential backoff.
+- **Enterprise Messaging Topology**: Durable queues (`payrail.notifications`, `payrail.statements`), persistent delivery mode (`persistent: true`), publisher confirmations (`ConfirmChannel`), manual acknowledgements (`noAck: false`), and consumer prefetch (`prefetch: 5` / `2`).
+- **Dead-Letter Routing (DLQ)**: Poison messages (invalid JSON, schema violations) and messages exceeding max retries (`3`) are routed to `payrail.dlx` and stored in `payrail.dead_letter`.
+- **Idempotent Consumers**: Deduplicates repeated delivery using MongoDB `ProcessedJobModel` records, preventing duplicate email/SMS dispatch or repeated statement generation.
+- **Operational Guide**: See [docs/messaging-dlq-guide.md](file:///c:/Users/black/PayRail/docs/messaging-dlq-guide.md) for DLQ inspection and replay instructions.
 
 ---
 
@@ -151,7 +154,8 @@ npm test
 npx tsx scripts/benchmark-cache.ts
 ```
 
-All 55 tests across 7 test suites pass cleanly:
+All 60 tests across 8 test suites pass cleanly:
+- `tests/workers.test.ts`: Phase 7 asynchronous workers, Transactional Outbox, Publisher Confirms, idempotent consumers, duplicate suppression, statement generation jobs, and Dead-Letter Queue (DLQ) routing.
 - `tests/cache-ratelimit.test.ts`: Phase 6 Redis caching (HIT/MISS/headers), cross-user cache isolation, write-triggered version invalidation, sliding-window rate limiting (per-IP and per-user), 429 Retry-After, and cache telemetry.
 - `tests/transfers.test.ts`: Phase 5 idempotent transfers, fingerprint validation, 409 conflicts on mismatch, 20 concurrent identical request stress test, and simultaneous distinct wallet debits.
 - `tests/wallets.test.ts`: Wallet creation, currency constraints, integer minor units, simulated deposits, IDOR protection, ledger immutability & reconciliation, and card freeze/unfreeze controls.

@@ -8,8 +8,9 @@ import { LedgerEntryModel } from '../ledger/ledger.model.js';
 import { CreateTransferInput } from './transfer.schema.js';
 import { BadRequestError, ConflictError, NotFoundError, AppError } from '../../shared/errors.js';
 import { logger } from '../../shared/logger.js';
-import { QueueManager, QUEUES } from '../../queues/queue.manager.js';
+import { QueueManager, QUEUES, ROUTING_KEYS } from '../../queues/queue.manager.js';
 import { CacheService } from '../../middleware/cache.middleware.js';
+import { OutboxService } from '../outbox/outbox.service.js';
 
 export interface TransferResult {
   transfer: ITransferDocument;
@@ -248,6 +249,36 @@ export class TransferService {
           { session },
         );
 
+        // 4. Transactional Outbox: Persist notification event atomically with transfer
+        const notificationEventId = uuidv4();
+        await OutboxService.enqueue(
+          notificationEventId,
+          ROUTING_KEYS.NOTIFICATION,
+          {
+            version: '1.0',
+            eventId: notificationEventId,
+            correlationId: transferId,
+            timestamp: new Date().toISOString(),
+            producer: 'payrail-transfers',
+            retryCount: 0,
+            topic: 'notification.dispatch',
+            payload: {
+              recipientUserId: destWallet.userId.toString(),
+              type: 'TRANSFER_RECEIVED',
+              channel: 'IN_APP',
+              title: 'Funds Received',
+              body: `You received ${amount} ${sourceWallet.currency} from wallet ${sourceWallet.id}`,
+              metadata: {
+                transferId,
+                sourceWalletId,
+                amount,
+                currency: sourceWallet.currency,
+              },
+            },
+          },
+          session,
+        );
+
         // Prepare side-effect message for dispatch AFTER transaction commits
         postCommitEvent = {
           eventId: uuidv4(),
@@ -275,6 +306,13 @@ export class TransferService {
           logger.warn('Failed to publish transfer event to RabbitMQ broker post-commit', { qErr });
         });
       }
+
+      // Trigger outbox processor in background post-commit
+      OutboxService.processOutboxBatch().catch((err) => {
+        logger.warn('Outbox post-commit processor trigger encountered error', {
+          error: err.message,
+        });
+      });
 
       // Invalidate cache for both sender and recipient
       const recipientId = (transferDoc as ITransferDocument | null)?.recipientUserId?.toString();
