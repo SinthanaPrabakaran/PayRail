@@ -128,17 +128,42 @@ curl -X POST http://localhost:3000/api/v1/transfers \
 > - Payload Conflict: Changing amounts or wallets with an already used key returns `409 Conflict`.
 > - Concurrency Safety: 20 simultaneous requests with the same key execute exactly once; remaining requests resolve safely without double-debiting.
 
+### 7. Read-Only Caching & Distributed Rate Limiting (Phase 6)
+- **Caching**: Endpoints `GET /api/v1/wallets`, `GET /api/v1/wallets/:id`, and `GET /api/v1/wallets/:id/transactions` are cached in Redis with user-scoped keys and 60s TTL.
+- **Cache Invalidation**: Writes (wallet creation, deposits, transfers) trigger an atomic $O(1)$ version bump (`payrail:cache:version:wallets:<userId>`) which instantly invalidates all cached entries for that user.
+- **Financial Correctness**: Cached balances are NEVER used as source of truth for financial operations; transfers and deposits always lock and query MongoDB with ACID transactions.
+- **Distributed Rate Limiting**: Enforced via an atomic Redis Lua sliding-window script:
+  - Public unauthenticated endpoints (`POST /api/v1/auth/login`, `POST /api/v1/auth/register`): 20 req / 60s per IP.
+  - Authenticated transfers (`POST /api/v1/transfers`): 60 req / 60s per user.
+  - Authenticated wallet operations (`/api/v1/wallets/*`): 100 req / 60s per user.
+  - Returns `429 Too Many Requests` with `Retry-After` header when limit is exceeded.
+- **Redis Outage Safety**: Rate limiter and cache fail open / bypass gracefully on Redis unavailability without breaking database financial integrity.
+
 ---
 
-## 🧪 Testing
+## 🧪 Testing & Benchmarks
 
 ```powershell
+# Run full integration and unit test suite
 npm test
+
+# Run read endpoint performance benchmark (Uncached MongoDB vs Cached Redis)
+npx tsx scripts/benchmark-cache.ts
 ```
-All 47 tests across 6 test suites pass cleanly:
+
+All 55 tests across 7 test suites pass cleanly:
+- `tests/cache-ratelimit.test.ts`: Phase 6 Redis caching (HIT/MISS/headers), cross-user cache isolation, write-triggered version invalidation, sliding-window rate limiting (per-IP and per-user), 429 Retry-After, and cache telemetry.
 - `tests/transfers.test.ts`: Phase 5 idempotent transfers, fingerprint validation, 409 conflicts on mismatch, 20 concurrent identical request stress test, and simultaneous distinct wallet debits.
 - `tests/wallets.test.ts`: Wallet creation, currency constraints, integer minor units, simulated deposits, IDOR protection, ledger immutability & reconciliation, and card freeze/unfreeze controls.
 - `tests/auth.test.ts`: Registration, login, normalized emails, generic errors, tampered/expired tokens, and Redis logout revocation.
 - `tests/transactions.test.ts`: MongoDB replica set multi-document ACID transactions with commit/abort.
 - `tests/health.test.ts`: Liveness and deep readiness probes.
 - `tests/api.test.ts`: Route definitions and error handling.
+
+### 📊 Measured Read Latency Benchmarks (30 runs each):
+- **Wallet Summary (`GET /api/v1/wallets/:id`)**:
+  - Cold Uncached (MongoDB): **avg = 13.44ms** (p95 = 20.19ms, min = 9.59ms, max = 48.23ms)
+  - Warm Cached (Redis): **avg = 7.93ms** (p95 = 9.31ms, min = 6.70ms, max = 10.41ms)
+- **Paginated Ledger (`GET /api/v1/wallets/:id/transactions`)**:
+  - Cold Uncached (MongoDB): **avg = 17.03ms** (p95 = 19.75ms, min = 13.64ms, max = 20.44ms)
+  - Warm Cached (Redis): **avg = 9.61ms** (p95 = 13.32ms, min = 7.27ms, max = 13.73ms)

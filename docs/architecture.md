@@ -59,8 +59,10 @@ PayRail/
 │   │   └── database.ts        # Unified database/infrastructure facade
 │   ├── middleware/            # Cross-cutting HTTP middlewares
 │   │   ├── auth.middleware.ts # JWT verification & Redis revocation check
+│   │   ├── cache.middleware.ts# User-scoped versioned caching & telemetry
 │   │   ├── errorHandler.middleware.ts
 │   │   ├── notFound.middleware.ts
+│   │   ├── rateLimiter.middleware.ts # Atomic Redis Lua sliding window limiter
 │   │   ├── requestId.middleware.ts
 │   │   └── requestLogger.middleware.ts
 │   ├── modules/               # Feature-oriented domain modules
@@ -111,9 +113,12 @@ PayRail/
 │   │   └── notification.worker.ts
 │   ├── app.ts                 # Express app factory
 │   └── index.ts               # HTTP server bootstrap & graceful shutdown
+├── scripts/
+│   └── benchmark-cache.ts     # Repeatable read latency benchmark harness
 ├── tests/
 │   ├── api.test.ts            # Route and error handler tests
 │   ├── auth.test.ts           # Authentication & token revocation tests
+│   ├── cache-ratelimit.test.ts# Phase 6 Cache & sliding-window rate limit tests
 │   ├── health.test.ts         # Probe tests
 │   ├── transactions.test.ts   # ACID transaction verification tests
 │   ├── transfers.test.ts      # Phase 5 Idempotent transfer & concurrency stress tests

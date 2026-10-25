@@ -9,6 +9,7 @@ import { CreateTransferInput } from './transfer.schema.js';
 import { BadRequestError, ConflictError, NotFoundError, AppError } from '../../shared/errors.js';
 import { logger } from '../../shared/logger.js';
 import { QueueManager, QUEUES } from '../../queues/queue.manager.js';
+import { CacheService } from '../../middleware/cache.middleware.js';
 
 export interface TransferResult {
   transfer: ITransferDocument;
@@ -274,6 +275,13 @@ export class TransferService {
           logger.warn('Failed to publish transfer event to RabbitMQ broker post-commit', { qErr });
         });
       }
+
+      // Invalidate cache for both sender and recipient
+      const recipientId = (transferDoc as ITransferDocument | null)?.recipientUserId?.toString();
+      await Promise.all([
+        CacheService.bumpUserVersion(userId, 'wallets'),
+        recipientId ? CacheService.bumpUserVersion(recipientId, 'wallets') : Promise.resolve(),
+      ]);
 
       return {
         transfer: transferDoc!,

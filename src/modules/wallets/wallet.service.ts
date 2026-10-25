@@ -4,6 +4,7 @@ import { WalletModel, IWalletDocument, Currency } from './wallet.model.js';
 import { LedgerEntryModel, ILedgerEntryDocument } from '../ledger/ledger.model.js';
 import { ConflictError, NotFoundError, BadRequestError } from '../../shared/errors.js';
 import { logger } from '../../shared/logger.js';
+import { CacheService } from '../../middleware/cache.middleware.js';
 
 export interface PaginatedResult<T> {
   items: T[];
@@ -42,6 +43,7 @@ export class WalletService {
           isActive: true,
         });
         logger.info('Wallet created for user', { userId, currency, walletId: wallet.id });
+        await CacheService.bumpUserVersion(userId, 'wallets');
       } catch (err: unknown) {
         if ((err as { code?: number }).code === 11000) {
           // Concurrency handling for unique index race condition
@@ -140,6 +142,9 @@ export class WalletService {
         amount: amountMinorUnits,
         newBalance: wallet.balance,
       });
+
+      // Post-commit cache invalidation: bump user's cache version
+      await CacheService.bumpUserVersion(userId, 'wallets');
 
       return { wallet, ledgerEntry: ledgerEntry! };
     } catch (error) {
