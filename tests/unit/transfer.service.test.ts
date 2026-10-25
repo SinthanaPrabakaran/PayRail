@@ -1,10 +1,11 @@
 import { TransferService } from '../../src/modules/transfers/transfer.service';
-import { WalletModel } from '../../src/modules/wallets/wallet.model';
-import { IdempotencyModel } from '../../src/modules/transfers/idempotency.model';
+import { TransferModel } from '../../src/modules/transfers/transfer.model';
 import { BadRequestError, NotFoundError } from '../../src/shared/errors';
 import mongoose from 'mongoose';
 
-describe('TransferService Domain Branches (Unit/Integration Mocked)', () => {
+jest.mock('../../src/modules/transfers/transfer.model');
+
+describe('TransferService Domain Branches (Unit)', () => {
   const userId = new mongoose.Types.ObjectId().toString();
 
   it('should throw BadRequestError if source and destination are identical', async () => {
@@ -19,6 +20,7 @@ describe('TransferService Domain Branches (Unit/Integration Mocked)', () => {
   });
 
   it('getTransferById should throw NotFoundError when transfer does not exist', async () => {
+    (TransferModel.findOne as jest.Mock).mockResolvedValue(null);
     const randomId = new mongoose.Types.ObjectId().toString();
     await expect(TransferService.getTransferById(userId, randomId)).rejects.toThrow(NotFoundError);
   });

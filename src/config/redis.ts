@@ -110,15 +110,12 @@ export class RedisConnectionManager implements IRedisLifecycle {
 
   public async checkStatus(): Promise<'up' | 'down'> {
     try {
-      const client = this.getClient();
-      if (client.status === 'close' || client.status === 'end') {
-        await client.connect();
+      if (this.getStatus() === 'up') {
+        const ping = await this.client?.ping();
+        return ping === 'PONG' ? 'up' : 'down';
       }
-      const ping = await client.ping();
-      this.isConnected = ping === 'PONG';
-      return this.isConnected ? 'up' : 'down';
+      return 'down';
     } catch {
-      this.isConnected = false;
       return 'down';
     }
   }

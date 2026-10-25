@@ -139,6 +139,23 @@ describe('Phase 4: Wallets, Ledger & Simulated Cards', () => {
 
       expect(res.status).toBe(400);
     });
+
+    it('should reject deposit into an inactive wallet with 400 Bad Request', async () => {
+      const inactive = await WalletModel.create({
+        userId: userA.id,
+        currency: 'EUR',
+        balance: 0,
+        isActive: false,
+      });
+
+      const res = await request(app)
+        .post(`/api/v1/wallets/${inactive.id}/deposit`)
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({ amount: 1000 });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.message).toContain('Cannot deposit funds into an inactive wallet');
+    });
   });
 
   describe('Authorization & IDOR Protection', () => {

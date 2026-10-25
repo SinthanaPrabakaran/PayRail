@@ -9,6 +9,7 @@ import { IdempotencyModel } from '../../src/modules/transfers/idempotency.model'
 import { LedgerEntryModel } from '../../src/modules/ledger/ledger.model';
 import { WalletService } from '../../src/modules/wallets/wallet.service';
 import { generateAccessToken } from '../../src/shared/token';
+import mongoose from 'mongoose';
 
 describe('Phase 5: Secure Idempotent Transfers & Concurrency Stress Tests', () => {
   const app = createApp();
@@ -205,6 +206,98 @@ describe('Phase 5: Secure Idempotent Transfers & Concurrency Stress Tests', () =
       expect(res2.status).toBe(409);
       expect(res2.body.error.code).toBe('ConflictError');
       expect(res2.body.error.message).toContain('payload differs from original request');
+    });
+
+    it('should reject transfer when source wallet is inactive with 400 Bad Request', async () => {
+      const inactiveUser = await UserModel.create({
+        email: `inactive-user-${Date.now()}@test.payrail`,
+        passwordHash: 'dummy-hash',
+        firstName: 'Inactive',
+        lastName: 'User',
+      });
+      const inactiveWallet = await WalletModel.create({
+        userId: inactiveUser.id,
+        currency: 'INR',
+        balance: 10000,
+        isActive: false,
+      });
+
+      const inactiveToken = generateAccessToken({
+        id: inactiveUser.id,
+        email: inactiveUser.email,
+      }).token;
+
+      const res = await request(app)
+        .post('/api/v1/transfers')
+        .set('Authorization', `Bearer ${inactiveToken}`)
+        .set('x-idempotency-key', `inactive-source-${Date.now()}`)
+        .send({
+          sourceWalletId: inactiveWallet.id,
+          destinationWalletId: walletB.id,
+          amount: 1000,
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.message).toContain('Source wallet is inactive');
+    });
+
+    it('should reject transfer when currencies mismatch with 400 Bad Request', async () => {
+      const usdWallet = await WalletService.getOrCreateWallet(userB.id, 'USD');
+
+      const res = await request(app)
+        .post('/api/v1/transfers')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .set('x-idempotency-key', `currency-mismatch-${Date.now()}`)
+        .send({
+          sourceWalletId: walletA.id,
+          destinationWalletId: usdWallet.id,
+          amount: 1000,
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.message).toContain('Currency mismatch');
+    });
+
+    it('should reject transfer when destination wallet is inactive with 400 Bad Request', async () => {
+      const destInactive = await WalletModel.create({
+        userId: userB.id,
+        currency: 'EUR',
+        balance: 0,
+        isActive: false,
+      });
+
+      const userAEurWallet = await WalletService.getOrCreateWallet(userA.id, 'EUR');
+      await WalletService.depositSimulatedFunds(userA.id, userAEurWallet.id, 5000, 'EUR_SEED');
+
+      const res = await request(app)
+        .post('/api/v1/transfers')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .set('x-idempotency-key', `inactive-dest-${Date.now()}`)
+        .send({
+          sourceWalletId: userAEurWallet.id,
+          destinationWalletId: destInactive.id,
+          amount: 1000,
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.message).toContain('Destination wallet is inactive');
+    });
+
+    it('should reject transfer when destination wallet does not exist with 404', async () => {
+      const nonExistent = new mongoose.Types.ObjectId().toString();
+
+      const res = await request(app)
+        .post('/api/v1/transfers')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .set('x-idempotency-key', `dest-not-found-${Date.now()}`)
+        .send({
+          sourceWalletId: walletA.id,
+          destinationWalletId: nonExistent,
+          amount: 1000,
+        });
+
+      expect(res.status).toBe(404);
+      expect(res.body.error.message).toContain('Destination wallet not found');
     });
   });
 

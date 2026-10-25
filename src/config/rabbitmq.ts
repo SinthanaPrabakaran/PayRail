@@ -92,13 +92,7 @@ export class RabbitMQConnectionManager implements IRabbitMQLifecycle {
   }
 
   public async checkStatus(): Promise<'up' | 'down'> {
-    try {
-      if (this.getStatus() === 'up') return 'up';
-      await this.connect(1, 1000);
-      return this.getStatus();
-    } catch {
-      return 'down';
-    }
+    return this.getStatus();
   }
 
   public getConnection(): amqplib.ChannelModel | null {

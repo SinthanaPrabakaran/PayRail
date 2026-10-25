@@ -39,25 +39,22 @@ export class MongoConnectionManager implements IMongoLifecycle {
     return MongoConnectionManager.instance;
   }
 
-  public async connect(maxRetries = 5, retryDelayMs = 2000): Promise<void> {
+  public async connect(maxRetries = 3, retryDelayMs = 1000): Promise<void> {
     if (this.getStatus() === 'up') return;
 
     let attempt = 0;
     while (attempt < maxRetries) {
       attempt++;
       try {
-        logger.info(`Connecting to MongoDB (attempt ${attempt}/${maxRetries})...`);
         await mongoose.connect(env.MONGODB_URI, {
           serverSelectionTimeoutMS: 3000,
           connectTimeoutMS: 5000,
           socketTimeoutMS: 30000,
         });
         this.isConnected = true;
-        logger.info('MongoDB connected successfully');
         return;
       } catch (error) {
         this.isConnected = false;
-        logger.warn(`MongoDB connection attempt ${attempt} failed: ${(error as Error).message}`);
         if (attempt >= maxRetries) {
           throw new Error(
             `Failed to connect to MongoDB after ${maxRetries} attempts: ${(error as Error).message}`,
@@ -86,8 +83,7 @@ export class MongoConnectionManager implements IMongoLifecycle {
         await mongoose.connection.db.admin().ping();
         return 'up';
       }
-      await this.connect(1, 1000);
-      return this.getStatus();
+      return 'down';
     } catch {
       return 'down';
     }
