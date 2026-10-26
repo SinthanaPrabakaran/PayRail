@@ -1,0 +1,164 @@
+{
+    "metrics": {
+        "data_received": {
+            "count": 153341,
+            "rate": 12665.828742840115
+        },
+        "http_req_blocked": {
+            "min": 0,
+            "med": 0,
+            "max": 19.6286,
+            "p(90)": 0,
+            "p(95)": 0.6988,
+            "avg": 0.3168354545454545
+        },
+        "http_req_connecting": {
+            "min": 0,
+            "med": 0,
+            "max": 0.6988,
+            "p(90)": 0,
+            "p(95)": 0.2872099999999985,
+            "avg": 0.03651090909090909
+        },
+        "vus_max": {
+            "value": 5,
+            "min": 5,
+            "max": 5
+        },
+        "http_req_waiting": {
+            "med": 10.581900000000001,
+            "max": 346.7417,
+            "p(90)": 41.94623000000003,
+            "p(95)": 141.70065499999998,
+            "avg": 32.645445454545445,
+            "min": 4.729
+        },
+        "http_req_receiving": {
+            "avg": 0.09129181818181818,
+            "min": 0,
+            "med": 0,
+            "max": 1.0125,
+            "p(90)": 0.5267799999999999,
+            "p(95)": 0.5405049999999999
+        },
+        "checks": {
+            "passes": 200,
+            "fails": 0,
+            "value": 1
+        },
+        "http_req_failed": {
+            "passes": 0,
+            "fails": 110,
+            "thresholds": {
+                "rate<0.01": false
+            },
+            "value": 0
+        },
+        "http_req_sending": {
+            "p(95)": 0,
+            "avg": 0.01102909090909091,
+            "min": 0,
+            "med": 0,
+            "max": 0.6614,
+            "p(90)": 0
+        },
+        "vus": {
+            "value": 5,
+            "min": 0,
+            "max": 5
+        },
+        "http_reqs": {
+            "count": 110,
+            "rate": 9.085901107416884
+        },
+        "http_req_tls_handshaking": {
+            "avg": 0,
+            "min": 0,
+            "med": 0,
+            "max": 0,
+            "p(90)": 0,
+            "p(95)": 0
+        },
+        "data_sent": {
+            "count": 59998,
+            "rate": 4955.780860389075
+        },
+        "iteration_duration": {
+            "med": 511.13835,
+            "max": 647.6789,
+            "p(90)": 544.98662,
+            "p(95)": 554.6767399999998,
+            "avg": 522.5258569999999,
+            "min": 504.8512
+        },
+        "iterations": {
+            "count": 100,
+            "rate": 8.259910097651714
+        },
+        "http_req_duration{expected_response:true}": {
+            "min": 4.729,
+            "med": 10.6591,
+            "max": 346.7417,
+            "p(90)": 41.99898000000003,
+            "p(95)": 141.70065499999998,
+            "avg": 32.747766363636345
+        },
+        "http_req_duration": {
+            "avg": 32.747766363636345,
+            "min": 4.729,
+            "med": 10.6591,
+            "max": 346.7417,
+            "p(90)": 41.99898000000003,
+            "p(95)": 141.70065499999998,
+            "thresholds": {
+                "p(95)<300": false
+            }
+        }
+    },
+    "setup_data": {
+        "users": [
+            {
+                "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2YWRmNWY5MGE5NzFkMGNlNDRkYWI0MGIiLCJlbWFpbCI6Ims2X3VzZXJfMTc5MzAyMzg4Nzk2MV92dTBfNDQ1OUBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIiwianRpIjoiMmFjZGFjOGEtNGM2Mi00ZWFkLWJkMDItZDk5YTkxOTA5ZWM4IiwiaXNzIjoicGF5cmFpbC1hdXRoIiwiYXVkIjoicGF5cmFpbC1hcGkiLCJpYXQiOjE3OTMwMjM4ODgsImV4cCI6MTc5MzAyNDc4OH0.tp5TIoFeCMnkcZ2m9ZMhw5_B3NlYy0v3a18ObWHNETE",
+                "walletId": "6adf5f90a971d0ce44dab40e"
+            },
+            {
+                "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2YWRmNWY5MGE5NzFkMGNlNDRkYWI0MTEiLCJlbWFpbCI6Ims2X3VzZXJfMTc5MzAyMzg4ODMyMV92dTFfNDQwN0BleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIiwianRpIjoiMzQ4ZDVkZWItNmE2Ny00M2VhLTljNjQtMjVjZDVlMTJjODY4IiwiaXNzIjoicGF5cmFpbC1hdXRoIiwiYXVkIjoicGF5cmFpbC1hcGkiLCJpYXQiOjE3OTMwMjM4ODgsImV4cCI6MTc5MzAyNDc4OH0.LzUU-QsvFAtKI9RGeQ7P7Ch0C4cEntwhfa0NC7h1kSI",
+                "walletId": "6adf5f90a971d0ce44dab414"
+            },
+            {
+                "walletId": "6adf5f90a971d0ce44dab41a",
+                "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2YWRmNWY5MGE5NzFkMGNlNDRkYWI0MTciLCJlbWFpbCI6Ims2X3VzZXJfMTc5MzAyMzg4ODYyMF92dTJfNTM3M0BleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIiwianRpIjoiYWRlYTVlNmUtZWM1NC00MTBhLWE2ZGUtNjQ4MTZmMzAzZjNiIiwiaXNzIjoicGF5cmFpbC1hdXRoIiwiYXVkIjoicGF5cmFpbC1hcGkiLCJpYXQiOjE3OTMwMjM4ODgsImV4cCI6MTc5MzAyNDc4OH0.CA-LH9n8Cm0rnY6zyTENGGoe30YJP3dFY0Yncrnv7UE"
+            },
+            {
+                "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2YWRmNWY5MWE5NzFkMGNlNDRkYWI0MWQiLCJlbWFpbCI6Ims2X3VzZXJfMTc5MzAyMzg4ODk4OF92dTNfMTk3QGV4YW1wbGUuY29tIiwicm9sZSI6InVzZXIiLCJqdGkiOiI4ZWRhMDhjMi03Mjk5LTQ3OTUtYTMzMi1lZDc3MmFmZmFkNjYiLCJpc3MiOiJwYXlyYWlsLWF1dGgiLCJhdWQiOiJwYXlyYWlsLWFwaSIsImlhdCI6MTc5MzAyMzg4OSwiZXhwIjoxNzkzMDI0Nzg5fQ.i9VSQp6BxRuqfZyikC5G-NWSs8OLSqq7Ga35-wrlJMs",
+                "walletId": "6adf5f91a971d0ce44dab420"
+            },
+            {
+                "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2YWRmNWY5MWE5NzFkMGNlNDRkYWI0MjMiLCJlbWFpbCI6Ims2X3VzZXJfMTc5MzAyMzg4OTI1Nl92dTRfMTMzNUBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIiwianRpIjoiMmU1ODllZGQtOTUwMi00OWUyLWI1OTAtNGE0Y2I5MzUxZjI1IiwiaXNzIjoicGF5cmFpbC1hdXRoIiwiYXVkIjoicGF5cmFpbC1hcGkiLCJpYXQiOjE3OTMwMjM4ODksImV4cCI6MTc5MzAyNDc4OX0.WB19BybE7Iyul1gOuPEWV5X4romR3xNC3W60NxcRv1w",
+                "walletId": "6adf5f91a971d0ce44dab426"
+            }
+        ]
+    },
+    "root_group": {
+        "name": "",
+        "path": "",
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {},
+        "checks": {
+                "status is 200": {
+                    "name": "status is 200",
+                    "path": "::status is 200",
+                    "id": "6210a8cd14cd70477eba5c5e4cb3fb5f",
+                    "passes": 100,
+                    "fails": 0
+                },
+                "has valid payload": {
+                    "name": "has valid payload",
+                    "path": "::has valid payload",
+                    "id": "2d1e4cc2b799a77209ac93b14f188087",
+                    "passes": 100,
+                    "fails": 0
+                }
+            }
+    }
+}

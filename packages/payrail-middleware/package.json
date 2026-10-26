@@ -1,0 +1,41 @@
+{
+  "name": "@payrail/middleware",
+  "version": "1.0.0",
+  "description": "Production-grade authentication, idempotency, and distributed rate limiting middleware for Express & TypeScript",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "prepack": "npm run build"
+  },
+  "keywords": [
+    "express",
+    "middleware",
+    "idempotency",
+    "rate-limiting",
+    "authentication",
+    "payrail"
+  ],
+  "author": "PayRail Core Team",
+  "license": "Apache-2.0",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "peerDependencies": {
+    "express": "^4.18.0 || ^5.0.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/jest": "^29.5.12",
+    "@types/node": "^20.11.0",
+    "express": "^4.19.2",
+    "jest": "^29.7.0",
+    "supertest": "^6.3.4",
+    "@types/supertest": "^6.0.2",
+    "ts-jest": "^29.1.2",
+    "typescript": "^5.3.3"
+  }
+}

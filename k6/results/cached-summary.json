@@ -1,0 +1,164 @@
+{
+    "root_group": {
+        "groups": {},
+        "checks": {
+                "status is 200": {
+                    "name": "status is 200",
+                    "path": "::status is 200",
+                    "id": "6210a8cd14cd70477eba5c5e4cb3fb5f",
+                    "passes": 95,
+                    "fails": 0
+                },
+                "has valid payload": {
+                    "name": "has valid payload",
+                    "path": "::has valid payload",
+                    "id": "2d1e4cc2b799a77209ac93b14f188087",
+                    "passes": 95,
+                    "fails": 0
+                }
+            },
+        "name": "",
+        "path": "",
+        "id": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "metrics": {
+        "http_req_waiting": {
+            "p(95)": 71.32587999999998,
+            "avg": 54.44676363636364,
+            "min": 16.9399,
+            "med": 30.4777,
+            "max": 771.6737,
+            "p(90)": 43.77548
+        },
+        "http_req_duration{expected_response:true}": {
+            "p(90)": 44.09277,
+            "p(95)": 72.16798499999997,
+            "avg": 54.762437272727276,
+            "min": 16.9399,
+            "med": 30.808300000000003,
+            "max": 776.5567
+        },
+        "data_sent": {
+            "count": 56073,
+            "rate": 4231.848482783113
+        },
+        "data_received": {
+            "count": 153334,
+            "rate": 11572.169408789718
+        },
+        "http_req_duration": {
+            "avg": 54.762437272727276,
+            "min": 16.9399,
+            "med": 30.808300000000003,
+            "max": 776.5567,
+            "p(90)": 44.09277,
+            "p(95)": 72.16798499999997,
+            "thresholds": {
+                "p(95)<300": false
+            }
+        },
+        "vus": {
+            "value": 5,
+            "min": 0,
+            "max": 5
+        },
+        "http_req_receiving": {
+            "max": 4.883,
+            "p(90)": 0.60684,
+            "p(95)": 0.65067,
+            "avg": 0.2401627272727272,
+            "min": 0,
+            "med": 0
+        },
+        "iterations": {
+            "rate": 7.169682482913269,
+            "count": 95
+        },
+        "http_req_blocked": {
+            "min": 0,
+            "med": 0,
+            "max": 25.7849,
+            "p(90)": 0,
+            "p(95)": 0.5670999999999997,
+            "avg": 0.3299745454545454
+        },
+        "http_req_tls_handshaking": {
+            "min": 0,
+            "med": 0,
+            "max": 0,
+            "p(90)": 0,
+            "p(95)": 0,
+            "avg": 0
+        },
+        "iteration_duration": {
+            "p(90)": 539.4924,
+            "p(95)": 542.85541,
+            "avg": 531.6332842105262,
+            "min": 520.6091,
+            "med": 531.1217,
+            "max": 548.9404
+        },
+        "http_req_sending": {
+            "max": 1.6745,
+            "p(90)": 0.3746400000000013,
+            "p(95)": 0.517735,
+            "avg": 0.0755109090909091,
+            "min": 0,
+            "med": 0
+        },
+        "http_req_connecting": {
+            "avg": 0.07732545454545456,
+            "min": 0,
+            "med": 0,
+            "max": 2.5397,
+            "p(90)": 0,
+            "p(95)": 0.2822599999999985
+        },
+        "vus_max": {
+            "value": 5,
+            "min": 5,
+            "max": 5
+        },
+        "checks": {
+            "passes": 190,
+            "fails": 0,
+            "value": 1
+        },
+        "http_reqs": {
+            "count": 110,
+            "rate": 8.301737611794312
+        },
+        "http_req_failed": {
+            "passes": 0,
+            "fails": 110,
+            "thresholds": {
+                "rate<0.01": false
+            },
+            "value": 0
+        }
+    },
+    "setup_data": {
+        "users": [
+            {
+                "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2YWRmODJjOGE5NzFkMGNlNDRkYWI0MmUiLCJlbWFpbCI6Ims2X3VzZXJfMTc5MzAzMjkwMzM2Ml92dTBfNTE5MUBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIiwianRpIjoiNDZkOTM1MWUtNzYxNi00NzFhLTg2NzEtYjQ1ZGNiZjRhZTk4IiwiaXNzIjoicGF5cmFpbC1hdXRoIiwiYXVkIjoicGF5cmFpbC1hcGkiLCJpYXQiOjE3OTMwMzI5MDQsImV4cCI6MTc5MzAzMzgwNH0._dgpR5Zku3ex8rSH8B7i6vZSSxvn8UOsf4DF0S8S7UA",
+                "walletId": "6adf82c8a971d0ce44dab431"
+            },
+            {
+                "walletId": "6adf82c8a971d0ce44dab438",
+                "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2YWRmODJjOGE5NzFkMGNlNDRkYWI0MzUiLCJlbWFpbCI6Ims2X3VzZXJfMTc5MzAzMjkwNDMwNV92dTFfODM5QGV4YW1wbGUuY29tIiwicm9sZSI6InVzZXIiLCJqdGkiOiIzYzgwMWNjMS0xNzgxLTQwYjYtOGU2OS0xNWY0MDMxMjllMDQiLCJpc3MiOiJwYXlyYWlsLWF1dGgiLCJhdWQiOiJwYXlyYWlsLWFwaSIsImlhdCI6MTc5MzAzMjkwNCwiZXhwIjoxNzkzMDMzODA0fQ.AP0A0eQBl75_5Q6D5JnH5qCaTGClo2WM-jlGBktClUI"
+            },
+            {
+                "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2YWRmODJjOWE5NzFkMGNlNDRkYWI0M2MiLCJlbWFpbCI6Ims2X3VzZXJfMTc5MzAzMjkwNDkwMV92dTJfMzQ3N0BleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIiwianRpIjoiMzBhODgwZGEtN2RjYy00ZWY0LTllMjQtNjFmNzRjZDA0ZjRkIiwiaXNzIjoicGF5cmFpbC1hdXRoIiwiYXVkIjoicGF5cmFpbC1hcGkiLCJpYXQiOjE3OTMwMzI5MDUsImV4cCI6MTc5MzAzMzgwNX0.BZWxnfiQC4Mn1-VvE8AXfcCSUm3ZNhIQtthDWNTWJPw",
+                "walletId": "6adf82c9a971d0ce44dab43f"
+            },
+            {
+                "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2YWRmODJjOWE5NzFkMGNlNDRkYWI0NDMiLCJlbWFpbCI6Ims2X3VzZXJfMTc5MzAzMjkwNTM2Nl92dTNfMTUwNUBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIiwianRpIjoiZGZhMDg4Y2MtYzE5MS00ZTVmLTg3ZmItZDQ3ZWQxMDhkNjY4IiwiaXNzIjoicGF5cmFpbC1hdXRoIiwiYXVkIjoicGF5cmFpbC1hcGkiLCJpYXQiOjE3OTMwMzI5MDUsImV4cCI6MTc5MzAzMzgwNX0.YaXCvnfM5QCP6_I8CaqRfWD6Ux3Xv0STvYsu2SBEdgM",
+                "walletId": "6adf82c9a971d0ce44dab446"
+            },
+            {
+                "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2YWRmODJjYWE5NzFkMGNlNDRkYWI0NGEiLCJlbWFpbCI6Ims2X3VzZXJfMTc5MzAzMjkwNTk2NF92dTRfNTc1M0BleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIiwianRpIjoiNjM4MWRiNDYtZDJjMS00NTk0LWI5YTYtMDU1OThlNWFkYTEyIiwiaXNzIjoicGF5cmFpbC1hdXRoIiwiYXVkIjoicGF5cmFpbC1hcGkiLCJpYXQiOjE3OTMwMzI5MDYsImV4cCI6MTc5MzAzMzgwNn0.nIJAOzosp7XUA-nt6wSWge0IiU7lkZXvoMdf5LI7Wmc",
+                "walletId": "6adf82caa971d0ce44dab44d"
+            }
+        ]
+    }
+}

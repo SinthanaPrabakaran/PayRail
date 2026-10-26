@@ -111,4 +111,48 @@ describe('Branch Coverage Fillers (Unit)', () => {
       await expect(AuthService.getProfile(userId)).rejects.toThrow(NotFoundError);
     });
   });
+
+  describe('RateLimiter x-forwarded-for branch', () => {
+    it('should extract first IP from x-forwarded-for header array/string', async () => {
+      const { rateLimiter } = await import('../../src/middleware/rateLimiter.middleware');
+      const mw = rateLimiter({ windowSeconds: 60, maxRequests: 10, keyPrefix: 'test-ip' });
+      const req: any = {
+        headers: { 'x-forwarded-for': '203.0.113.195, 70.41.3.18' },
+        socket: {},
+      };
+      const res: any = { setHeader: jest.fn() };
+      const next = jest.fn();
+
+      await mw(req, res, next);
+      expect(next).toHaveBeenCalled();
+    });
+
+    it('should fallback to req.socket.remoteAddress when x-forwarded-for is missing', async () => {
+      const { rateLimiter } = await import('../../src/middleware/rateLimiter.middleware');
+      const mw = rateLimiter({ windowSeconds: 60, maxRequests: 10, keyPrefix: 'test-sock' });
+      const req: any = {
+        headers: {},
+        socket: { remoteAddress: '198.51.100.1' },
+      };
+      const res: any = { setHeader: jest.fn() };
+      const next = jest.fn();
+
+      await mw(req, res, next);
+      expect(next).toHaveBeenCalled();
+    });
+  });
+
+  describe('CardService.getUserCards', () => {
+    it('should call CardModel.find with user ObjectId', async () => {
+      const { CardService } = await import('../../src/modules/cards/card.service');
+      const { CardModel } = await import('../../src/modules/cards/card.model');
+      const userId = new mongoose.Types.ObjectId().toHexString();
+      const findSpy = jest.spyOn(CardModel, 'find').mockResolvedValueOnce([{ id: 'c1' }] as any);
+
+      const cards = await CardService.getUserCards(userId);
+      expect(cards).toHaveLength(1);
+      findSpy.mockRestore();
+    });
+  });
 });
+
