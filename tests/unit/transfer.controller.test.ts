@@ -36,13 +36,11 @@ describe('Transfers Controller & Routes (Unit)', () => {
 
   describe('POST /api/v1/transfers', () => {
     it('should return 400 Bad Request when x-idempotency-key is missing', async () => {
-      const res = await request(app)
-        .post('/api/v1/transfers')
-        .send({
-          sourceWalletId: 'w1',
-          destinationWalletId: 'w2',
-          amount: 1000,
-        });
+      const res = await request(app).post('/api/v1/transfers').send({
+        sourceWalletId: 'w1',
+        destinationWalletId: 'w2',
+        amount: 1000,
+      });
 
       expect(res.status).toBe(400);
       expect(res.body.error.message).toContain('is required for transfers');

@@ -1,0 +1,174 @@
+name: PayRail CI & Security Pipeline
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-typecheck:
+    name: Lint & Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: 'npm'
+
+      - name: Install dependencies from lockfile
+        run: npm ci
+
+      - name: Check TypeScript types
+        run: npm run typecheck
+
+      - name: Check ESLint & Prettier
+        run: npm run lint
+
+  test-unit:
+    name: Unit & Reusable Package Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: 'npm'
+
+      - name: Install dependencies from lockfile
+        run: npm ci
+
+      - name: Run Unit Tests
+        run: npm run test:unit
+
+      - name: Run Reusable Middleware Package Tests
+        run: npm run test:package
+
+  test-integration-and-coverage:
+    name: Integration Tests & Coverage
+    runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:7.0
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --port 27017 --eval 'db.adminCommand(\"ping\")'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7.2-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+
+      rabbitmq:
+        image: rabbitmq:3.13-management-alpine
+        ports:
+          - 5672:5672
+          - 15672:15672
+        env:
+          RABBITMQ_DEFAULT_USER: payrail
+          RABBITMQ_DEFAULT_PASS: payrail_rabbit_pass_dev
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: 'npm'
+
+      - name: Install dependencies from lockfile
+        run: npm ci
+
+      - name: Initialize MongoDB Replica Set (rs0) for ACID Transactions
+        run: |
+          docker exec ${{ job.services.mongodb.id }} mongosh --quiet --eval '
+            try {
+              rs.initiate({
+                _id: "rs0",
+                members: [{ _id: 0, host: "localhost:27017" }]
+              });
+            } catch(e) {
+              print("Replica set already initialized: " + e);
+            }
+          '
+          sleep 3
+
+      - name: Run Test Coverage (Unit + Integration)
+        env:
+          NODE_ENV: test
+          PORT: 3000
+          MONGODB_URI: mongodb://127.0.0.1:27017/payrail_test?replicaSet=rs0&directConnection=true
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: 6379
+          REDIS_PASSWORD: ""
+          RABBITMQ_URL: amqp://payrail:payrail_rabbit_pass_dev@127.0.0.1:5672
+          JWT_SECRET: payrail_super_secret_jwt_key_test_ci_mode_32chars
+        run: npm run test:coverage
+
+      - name: Upload Coverage Artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 14
+
+  docker-build-validate:
+    name: Docker Multi-Stage Build & Security Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker Image (Dry Run & Layer Cache)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: payrail:ci-test
+          load: true
+
+      - name: Verify Non-Root User in Built Image
+        run: |
+          RUNNER_USER=$(docker run --rm payrail:ci-test whoami)
+          if [ "$RUNNER_USER" != "node" ]; then
+            echo "Security Error: Container is running as $RUNNER_USER instead of unprivileged 'node' user"
+            exit 1
+          fi
+          echo "Verified: Container runs as non-root user '$RUNNER_USER'"
+
+      - name: Verify Package Packing (npm pack dry-run)
+        run: |
+          cd packages/payrail-middleware
+          npm pack --dry-run

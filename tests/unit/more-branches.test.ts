@@ -42,9 +42,7 @@ describe('Branch Coverage Fillers (Unit)', () => {
 
     it('should throw ConflictError if wallet is still null after creation/retry', async () => {
       const userId = new mongoose.Types.ObjectId().toHexString();
-      (WalletModel.findOne as jest.Mock)
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(null);
+      (WalletModel.findOne as jest.Mock).mockResolvedValueOnce(null).mockResolvedValueOnce(null);
 
       (WalletModel.create as jest.Mock).mockRejectedValueOnce({ code: 11000 });
 
@@ -155,4 +153,3 @@ describe('Branch Coverage Fillers (Unit)', () => {
     });
   });
 });
-

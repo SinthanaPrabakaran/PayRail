@@ -352,3 +352,64 @@ app.post('/api/payments',
   ```
   Verified output: `payrail-middleware-1.0.0.tgz` (7.8 kB, 26 files, 0 secrets, `private: false`, ready for internal/scoped npm distribution).
 
+---
+
+## 11. Productionization & Cloud Deployment (Phase 10)
+
+PayRail has been hardened for production environments across container security, local staging orchestration, automated CI/CD pipelines, and AWS cloud deployment options.
+
+### 🛡️ Production Multi-Stage Dockerfile & Image Security
+- **Multi-Stage Build (`Dockerfile`)**:
+  - `builder`: Installs full dependencies with `npm ci`, compiles TypeScript to `dist/`.
+  - `deps`: Installs production dependencies only via `npm ci --omit=dev && npm cache clean --force`.
+  - `runner`: Uses `node:22-alpine` unprivileged base image.
+- **Minimal Non-Root Runtime**: Drops root privileges; executes strictly as the built-in unprivileged `node` user (`USER node`).
+- **Zero Secret Leaks**: Verified by `.dockerignore` excluding `.env*`, tests, coverage, development tools, and git artifacts from the image context.
+- **Native Health Check**: Built-in HTTP probe via `node dist/healthcheck.js` querying `/health` every 15s without third-party binary dependencies.
+- **Graceful Termination**: Handles `SIGTERM` and `SIGINT` signals, closing HTTP listeners and terminating open database transactions within a bounded 10-second drain window.
+
+### 🐳 Production-Minded Local Staging (`docker-compose.prod.yml`)
+To run PayRail in a production-like staging topology locally:
+```bash
+docker compose -f docker-compose.prod.yml up --build -d
+```
+Includes:
+- Application container running the hardened multi-stage image.
+- MongoDB 7.0 Single-Node Replica Set (`rs0`) for ACID transactions.
+- Redis 7.2 with password authentication & append-only persistence.
+- RabbitMQ 3.13 with durable queues and management console (`:15672`).
+- Healthy service dependency chains ensuring backing stores pass readiness probes before the API boots.
+
+> [!IMPORTANT]
+> **Production Infrastructure Note**: In real-world production, never run single-node Docker databases. Backing services require managed cloud offerings: **MongoDB Atlas** (Multi-AZ Replica Set with TLS 1.3 and PITR backups), **AWS ElastiCache Redis** (In-Transit TLS, Multi-AZ Auto-Failover), and **Amazon MQ / CloudAMQP** (RabbitMQ Quorum Queues with disk alarms).
+
+### ⚙️ CI/CD Pipelines (GitHub Actions)
+PayRail provides two automated workflows in `.github/workflows/`:
+
+1. **`ci.yml` (Pull Requests & Pushes)**:
+   - Dependency installation via `npm ci`.
+   - Code quality validation via `npm run typecheck` and `npm run lint`.
+   - Unit tests & reusable package tests (`npm run test:unit`, `npm run test:package`).
+   - Integration tests with ephemeral MongoDB replica set, Redis, and RabbitMQ service containers.
+   - Code coverage thresholds validation (uploading 14-day artifacts).
+   - Docker Buildx multi-stage image compilation and non-root user verification.
+   - Package distribution dry-run (`npm pack --dry-run`).
+
+2. **`deploy.yml` (Production Release to AWS ECS Fargate)**:
+   - **Zero Long-Lived Credentials**: Uses GitHub Actions **OIDC (OpenID Connect)** to assume an ephemeral, least-privilege IAM Role (`AWS_ROLE_TO_ASSUME`).
+   - Builds, tags, and pushes production Docker images to Amazon ECR.
+   - Renders updated ECS task definitions with AWS Secrets Manager references.
+   - Deploys to AWS ECS Fargate with **deployment circuit breaker** auto-rollback enabled.
+   - Guardrails: Enforces explicit branch/tag triggering, manual approval environments, and aborts immediately if secrets are unconfigured.
+
+### ☁️ Environment Outcomes Summary
+
+| Scope | Execution Mechanism | Validation Status |
+| :--- | :--- | :--- |
+| **Locally Verified** | Local Docker Engine & Test Runner | ✅ 100% Verified (Multi-stage build, non-root user, native healthcheck, zero lint errors, all tests passing) |
+| **CI-Verified** | GitHub Actions (`.github/workflows/ci.yml`) | ✅ Ready (Configured with automated services, replica set bootstrap, and coverage enforcement) |
+| **Cloud-Deployed** | AWS ECS Fargate via OIDC (`.github/workflows/deploy.yml`) | ⏸️ Documented & Guardrailed (Awaits user's AWS IAM OIDC Role and VPC infrastructure provisioning) |
+
+Detailed cloud setup instructions, IAM policies, migration strategies, rollback procedures, cost estimates, and pre-flight checklists are documented in [docs/aws-deployment.md](file:///c:/Users/black/PayRail/docs/aws-deployment.md).
+
+

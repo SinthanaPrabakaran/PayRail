@@ -54,12 +54,10 @@ describe('Notifications & Ledger Routes (Unit)', () => {
     it('should enqueue statement job and return 202 Accepted', async () => {
       (QueueManager.publishWithConfirm as jest.Mock).mockResolvedValue(true);
 
-      const res = await request(app)
-        .post('/api/v1/notifications/statement-jobs')
-        .send({
-          walletId: new mongoose.Types.ObjectId().toString(),
-          format: 'JSON',
-        });
+      const res = await request(app).post('/api/v1/notifications/statement-jobs').send({
+        walletId: new mongoose.Types.ObjectId().toString(),
+        format: 'JSON',
+      });
 
       expect(res.status).toBe(202);
       expect(res.body.success).toBe(true);
@@ -68,11 +66,9 @@ describe('Notifications & Ledger Routes (Unit)', () => {
     });
 
     it('should return 400 for invalid wallet ObjectId', async () => {
-      const res = await request(app)
-        .post('/api/v1/notifications/statement-jobs')
-        .send({
-          walletId: 'invalid-id',
-        });
+      const res = await request(app).post('/api/v1/notifications/statement-jobs').send({
+        walletId: 'invalid-id',
+      });
 
       expect(res.status).toBe(400);
     });
